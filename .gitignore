@@ -1,0 +1,8 @@
+__pycache__
+.env
+
+node_modules
+yarn.lock
+package-lock.json
+
+venv
