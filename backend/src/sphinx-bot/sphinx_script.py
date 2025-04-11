@@ -1,5 +1,6 @@
 from pipecat_flows import FlowManager, FlowConfig, FlowsFunctionSchema, FlowArgs, FlowResult
 from pipecat.frames.frames import TextFrame
+from status_utils import status_updater
 
 # Define handler functions
 # async def collect_name_handler(args, result, flow_manager):
@@ -14,6 +15,11 @@ async def collect_name_handler(args : FlowArgs) -> FlowResult:
 
 async def ready_handler(args: FlowArgs) -> FlowResult:
     print("ready_handler", args)
+    # Update status directly via API
+    await status_updater.update_status(
+        "Waiting for user to be ready",
+        {"node": "ready"}
+    )
     user_input = args.get("user_input", "").lower()
     is_ready = any(word in user_input for word in ["ready", "proceed", "continue", "yes"])
     return {"status": "success", "user_ready": is_ready}
@@ -25,15 +31,19 @@ async def handle_user_readiness(
 ):
     print("handle_user_readiness", result)
     if result["user_ready"]:
-        # Send status message about the transition
-        status_frame = TextFrame(text="[STATUS] Moving to name collection phase")
-        await flow_manager.task.queue_frames([status_frame])
+        # Update status directly via API
+        await status_updater.update_status(
+            "Moving to name collection phase",
+            {"node": "collect_name"}
+        )
         
         await flow_manager.set_node("collect_name", sphinx_flow_config["nodes"]["collect_name"])
     else:
-        # Send status message about staying in the greeting node
-        status_frame = TextFrame(text="[STATUS] Remaining in greeting phase until user is ready")
-        await flow_manager.task.queue_frames([status_frame])
+        # Update status directly via API
+        await status_updater.update_status(
+            "Remaining in greeting phase until user is ready",
+            {"node": "greeting"}
+        )
         
         # Stay on the current node if the user is not ready
         await flow_manager.set_node("greeting", sphinx_flow_config["nodes"]["greeting"])
@@ -45,15 +55,19 @@ async def handle_user_readiness_meditation(
 ):
     print("handle_user_readiness_meditation")
     if result["user_ready"]:
-        # Send status message about the transition
-        status_frame = TextFrame(text="[STATUS] Moving to challenge selection phase")
-        await flow_manager.task.queue_frames([status_frame])
+        # Update status directly via API
+        await status_updater.update_status(
+            "Moving to challenge selection phase",
+            {"node": "select_challenge"}
+        )
         
         await flow_manager.set_node("select_challenge", sphinx_flow_config["nodes"]["select_challenge"])
     else:
-        # Send status message about staying in meditation
-        status_frame = TextFrame(text="[STATUS] Continuing guided meditation until user is ready")
-        await flow_manager.task.queue_frames([status_frame])
+        # Update status directly via API
+        await status_updater.update_status(
+            "Continuing guided meditation until user is ready",
+            {"node": "guided_meditation"}
+        )
         
         # Stay on the current node if the user is not ready
         await flow_manager.set_node("guided_meditation", sphinx_flow_config["nodes"]["guided_meditation"])
@@ -126,7 +140,7 @@ sphinx_flow_config = FlowConfig(
         "select_challenge": {
             "task_messages": [
                 {"role": "system", "content": "Ask the user to select a challenge from the list, in this fashion : Which of these challenging states listed on the poster resonate with you at this moment?\
-                    The challenge must be one of the following: Fearful / Anxious, Stagnant / Ruminating, Disassociated / Numb, Unhealthy, Scarcity, Excluded, Lack of Control/Agency, Disembodied / Ungrounded, Obsessed, Silenced / Unheard, Lack of Purpose / Unmotivated, Shameful"}
+                    The challenge must be one of the following: Fearful, Anxious, Stagnant , Ruminating, Disassociated, Numb, Unhealthy, Scarcity, Excluded, Lack of Control, Lack of Agency, Disembodied, Ungrounded, Obsessed, Silenced, Unheard, Lack of Purpose, Unmotivated, Shameful."}
             ],
             "functions": [
                 FlowsFunctionSchema(

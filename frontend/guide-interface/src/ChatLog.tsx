@@ -15,9 +15,10 @@ export interface ChatMessage {
 interface ChatLogProps {
   messages: ChatMessage[];
   isWaitingForUser: boolean;
+  isUserSpeaking: boolean;
 }
 
-const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser }) => {
+const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpeaking }) => {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new messages arrive
@@ -34,6 +35,11 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser }) => {
         {isWaitingForUser && (
           <div className="waiting-indicator">
             Waiting for your response...
+          </div>
+        )}
+        {isUserSpeaking && (
+          <div className="speaking-indicator">
+            Speaking detected...
           </div>
         )}
       </div>

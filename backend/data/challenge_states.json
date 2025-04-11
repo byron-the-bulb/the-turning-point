@@ -1,0 +1,71 @@
+{
+  "Fearful / Anxious": [
+    "Confident",
+    "Experimental / Risking",
+    "Courageous",
+    "Leadership"
+  ],
+  "Stagnant / Ruminating": [
+    "Experimental / Risking",
+    "Spontaneous / Decisive",
+    "Enthusiastic"
+  ],
+  "Disassociated / Numb": [
+    "Engaged",
+    "Curious",
+    "Feeling / Empathetic"
+  ],
+  "Unhealthy": [
+    "Full Capacity",
+    "Energetic",
+    "Honoring Body"
+  ],
+  "Scarcity": [
+    "Generous",
+    "Having/Abundance",
+    "Indulging in Pleasure",
+    "Investing",
+    "Experimental / Risking"
+  ],
+  "Excluded": [
+    "Belonging",
+    "Respected",
+    "Trusting Others",
+    "Leadership",
+    "Receiving"
+  ],
+  "Lack of Control/Agency": [
+    "Experimental / Risking",
+    "Accepting Change",
+    "Trusting Others",
+    "Leadership",
+    "Relaxed"
+  ],
+  "Disembodied / Ungrounded": [
+    "Honoring Body",
+    "Joyful Physical Expression",
+    "Focused Clarity",
+    "Enthusiastic"
+  ],
+  "Obsessed": [
+    "Relaxed",
+    "Accepting Change",
+    "Experimental"
+  ],
+  "Silenced / Unheard": [
+    "Leadership",
+    "Confident",
+    "Receiving"
+  ],
+  "Lack of Purpose / Unmotivated": [
+    "Enthusiastic",
+    "Leadership",
+    "Focused Clarity"
+  ],
+  "Shameful": [
+    "Self-Love / Pride",
+    "Leadership",
+    "Confident",
+    "Honoring Body"
+  ]
+}

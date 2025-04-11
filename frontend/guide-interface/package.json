@@ -6,6 +6,7 @@
     "@daily-co/daily-js": "^0.77.0",
     "@daily-co/daily-react": "^0.22.0",
     "@pipecat-ai/client-js": "^0.3.5",
+    "@pipecat-ai/client-react": "^0.3.5",
     "@pipecat-ai/daily-transport": "^0.3.8",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
@@ -22,12 +23,12 @@
     "typescript": "^4.9.5",
     "web-vitals": "^2.1.4"
   },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
+"scripts": {
+  "start": "craco start",
+  "build": "craco build",
+  "test": "craco test",
+  "eject": "react-scripts eject"
+},
   "eslintConfig": {
     "extends": [
       "react-app",
@@ -47,6 +48,8 @@
     ]
   },
   "devDependencies": {
-    "@types/protobufjs": "^6.0.0"
+    "@craco/craco": "^7.1.0",
+    "@types/protobufjs": "^6.0.0",
+    "babel-plugin-transform-import-meta": "^2.3.2"
   }
 }

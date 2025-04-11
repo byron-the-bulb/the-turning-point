@@ -4,33 +4,28 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
+import argparse
 import asyncio
 import os
 import sys
+import argparse
 
 from dotenv import load_dotenv
 from loguru import logger
 
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import (
-    BotInterruptionFrame, DataFrame, EndFrame, TextFrame, TranscriptionFrame,
-    TransportMessageFrame
-)
-from dataclasses import dataclass
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
-from pipecat.serializers.protobuf import ProtobufFrameSerializer
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.transports.network.websocket_server import (
-    WebsocketServerParams,
-    WebsocketServerTransport,
-)
+from pipecat.transports.services.daily import DailyTransport, DailyParams
 from pipecat.services.whisper import WhisperSTTService, Model
+from pipecat.processors.frameworks.rtvi import RTVIProcessor, RTVIConfig, RTVIObserver
 from pipecat_flows import FlowManager
 from sphinx_script import sphinx_flow_config
+from status_utils import status_updater
 
 
 
@@ -90,54 +85,27 @@ class SessionTimeoutHandler:
 # by both the pipeline and the serializer
 
 
+async def run_bot(room_url, token, identifier):
+    """Run the Sphinx voice bot with the provided room URL and token."""
+    logger.info(f"Starting Sphinx bot in room {room_url} with identifier {identifier}")
 
-class CustomVADAnalyzer(SileroVADAnalyzer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.transport = None
-        self.speaking = False
 
-    def set_transport(self, transport):
-        self.transport = transport
-        transport._register_event_handler("on_user_speaking_started")
-        transport._register_event_handler("on_user_speaking_stopped")
-
-    async def analyze(self, frame):
-        result = await super().analyze(frame)
-        if self.transport:
-            if result and not self.speaking:
-                self.speaking = True
-                await self.transport.emit("on_user_speaking_started")
-            elif not result and self.speaking:
-                self.speaking = False
-                await self.transport.emit("on_user_speaking_stopped")
-        return result
-
-async def main():
-    # Create the custom VAD analyzer
-    vad_analyzer = CustomVADAnalyzer()
-    serializer = ProtobufFrameSerializer()
-
-    transport = WebsocketServerTransport(
-        params=WebsocketServerParams(
-            serializer=serializer,  
+    transport = DailyTransport(
+        room_url=room_url,
+        token=token,
+        bot_name="Sphinx",
+        params=DailyParams(
             audio_out_enabled=True,
             add_wav_header=True,
             vad_enabled=True,
-            vad_analyzer=vad_analyzer,
+            vad_analyzer=SileroVADAnalyzer(),
             vad_audio_passthrough=True,
-            session_timeout=60 * 3,  # 3 minutes
-        )
+            session_timeout=60 * 2,
+        ),
     )
     
-    # Set the transport on the VAD analyzer
-    vad_analyzer.set_transport(transport)
-
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
-    messages = []
-    context = OpenAILLMContext(messages)
-    context_aggregator = llm.create_context_aggregator(context)
-
+    
     stt = WhisperSTTService(
             api_key=os.getenv("OPENAI_API_KEY"),
             model=Model.DISTIL_MEDIUM_EN
@@ -157,11 +125,13 @@ async def main():
 
     context = OpenAILLMContext(messages)
     context_aggregator = llm.create_context_aggregator(context)
-
-   
+    
+    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
+    await status_updater.initialize(rtvi, identifier, room_url)
     pipeline = Pipeline(
         [
             transport.input(),  # Websocket input from client
+            rtvi,
             stt,  # Speech-To-Text
             context_aggregator.user(),
             llm,  # LLM
@@ -178,6 +148,7 @@ async def main():
             audio_out_sample_rate=16000,
             allow_interruptions=True,
         ),
+        observers=[RTVIObserver(rtvi)]
     )
 
     flow_manager = FlowManager(
@@ -188,87 +159,50 @@ async def main():
         flow_config=sphinx_flow_config
     )
 
-
-    @transport.event_handler("on_client_connected")
-    async def on_client_connected(transport, client):
+    @transport.event_handler("on_participant_joined")
+    async def on_participant_joined(transport, participant):
         # Kick off the conversation.
-        logger.info(f"New client connected: {client.remote_address}")
+        participant_id = participant['id']
+        logger.info(f"New client connected: {participant_id} using identifier {identifier}")
         
         try:
-            # Send a welcome message directly via WebSocket to bypass TTS
-            welcome_message = "Connected to Sphinx Voice Bot. Please start speaking when ready."
-            welcome_frame = TextFrame(text=welcome_message)
+            # Update status updater with the participant ID
+            await status_updater.initialize(rtvi, identifier, room_url)
+            logger.info(f"StatusUpdater initialized with identifier: {identifier}")
             
-            #Serialize and send directly to this client
-            serialized_frame = await serializer.serialize(welcome_frame)
-            await client.send_bytes(serialized_frame)
-            #await send_status_message(welcome_message)
-            logger.debug("Sent welcome message to client")
+            # Start transcription for the user
+            await transport.capture_participant_transcription(participant_id)
             
             # Initialize the flow manager
             await flow_manager.initialize()
         except Exception as e:
             logger.error(f"Error during client connection handling: {e}")
 
-    @transport.event_handler("on_session_timeout")
-    async def on_session_timeout(transport, client):
-        logger.info(f"Entering in timeout for {client.remote_address}")
-
-        try:
-            # Send a timeout message directly via WebSocket to bypass TTS
-            timeout_message = "Your session is timing out due to inactivity."
-            timeout_frame = TextFrame(text=timeout_message)
-            
-            # Serialize and send directly to this client
-            serialized_frame = await serializer.serialize(timeout_frame)
-            await client.send_bytes(serialized_frame)
-            
-            # Then handle the timeout with the handler
-            timeout_handler = SessionTimeoutHandler(task, tts)
-            await timeout_handler.handle_timeout(client)
-        except Exception as e:
-            logger.error(f"Error during session timeout handling: {e}")
-
-    # Add event handlers for transcription and speaking events
-    # Add a function to send text frames directly to clients via WebSocket
-    # This bypasses the pipeline so the messages aren't processed by TTS
-    async def send_status_message(message_text):
-        try:
-            # Create a TextFrame that will be properly serialized
-            text_frame = TextFrame(text=message_text)
-            
-            # Send directly through the WebSocket to bypass the TTS engine
-            # This follows the Pipecat AI chatbot's recommendation
-            serialized_frame = await serializer.serialize(text_frame)
-            
-            # Send to all connected clients
-            for client in transport.clients:
-                await transport.send_bytes(client, serialized_frame)
-                
-            logger.debug(f"Sent status message directly via WebSocket: {message_text}")
-        except Exception as e:
-            logger.error(f"Error sending message frame: {e}")
-    
-    # TranscriptionHandler defined above    
-    
-    @transport.event_handler("on_user_speaking_started")
-    async def on_user_speaking_started(transport, client):
-        logger.info(f"User at {client.remote_address} started speaking")
+    @transport.event_handler("on_participant_left")
+    async def on_participant_left(transport, participant, reason):
+        # Close the status updater session
+        await status_updater.close()
         
-        # Notify about speech detection
-        await send_status_message("[STATUS] Speech detected")
-    
-    @transport.event_handler("on_user_speaking_stopped")
-    async def on_user_speaking_stopped(transport, client):
-        logger.info(f"User at {client.remote_address} stopped speaking")
-        
-        # Notify that we're processing
-        await send_status_message("[STATUS] Processing speech...")
-    
+        # Cancel the pipeline, which stops processing and removes the bot from the room
+        await task.cancel()
+
     runner = PipelineRunner()
-
     await runner.run(task)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description="Sphinx Voice Bot")
+    parser.add_argument(
+        "-u", "--url", required=True, help="Room URL to connect to"
+    )
+    parser.add_argument(
+        "-t", "--token", required=True, help="Access token for the room"
+    )
+
+    parser.add_argument(
+        "-i", "--identifier", required=True, help="Unique bot identifier"
+    )
+
+    args = parser.parse_args()
+
+    asyncio.run(run_bot(args.url, args.token, args.identifier))
