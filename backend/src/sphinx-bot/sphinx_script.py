@@ -43,10 +43,10 @@ async def consider_challenge_callback(
         await flow_manager.set_node("guided_meditation", sphinx_flow_config["nodes"]["guided_meditation"])
 
 async def select_challenge_handler(args : FlowArgs) -> FlowResult:
-    challenge = args["challenge"]
+    challenge = args.get("challenge", "").lower()
     logger.info(f"[Flow]select_challenge_handler: {challenge}")
     #Validate challenge
-    if challenge not in ["Fearful", "Anxious", "Stagnant", "Ruminating", "Disassociated", "Numb", "Unhealthy", "Scarcity", "Excluded", "Lack of Control", "Disembodied", "Ungrounded", "Obsessed", "Silenced", "Unheard", "Lack of Purpose", "Unmotivated", "Shameful"]:
+    if challenge not in ["fearful", "anxious", "stagnant", "ruminating", "disassociated", "numb", "unhealthy", "scarcity", "excluded", "lack of control", "disembodied", "ungrounded", "obsessed", "silenced", "unheard", "lack of purpose", "unmotivated", "shameful"]:
         return {"status": "error", "message": "Invalid challenge"}
     return {"status": "success", "challenge": challenge}
 
