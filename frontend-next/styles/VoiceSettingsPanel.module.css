@@ -1,0 +1,45 @@
+.voiceSettingsPanel {
+  margin: 20px 0;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: white;
+  width: 100%;
+  max-width: 800px;
+}
+
+.settingsToggleBtn {
+  width: 100%;
+  background-color: #f5f5f5;
+  border: none;
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 16px;
+  font-weight: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.settingsToggleBtn:hover {
+  background-color: #eeeeee;
+}
+
+.chevron {
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.up {
+  transform: rotate(180deg);
+}
+
+.down {
+  transform: rotate(0);
+}
+
+.settingsContent {
+  padding: 16px;
+  border-top: 1px solid #e0e0e0;
+}

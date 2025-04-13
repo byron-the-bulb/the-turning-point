@@ -1,0 +1,82 @@
+.emotionSelector {
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.emotionSelector label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.noEmotionsMessage {
+  font-style: italic;
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.emotionList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.emotionItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 4px;
+  background-color: #f8f8f8;
+  border: 1px solid #eee;
+}
+
+.emotionNameSelect,
+.emotionLevelSelect {
+  padding: 6px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background-color: white;
+  font-size: 14px;
+}
+
+.removeEmotionBtn {
+  background-color: #f44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-left: auto;
+}
+
+.removeEmotionBtn:hover {
+  background-color: #d32f2f;
+}
+
+.addEmotionBtn {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.addEmotionBtn:hover {
+  background-color: #388e3c;
+}
+
+.addEmotionBtn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.emotionInfo {
+  margin-top: 10px;
+  color: #666;
+  font-size: 12px;
+}

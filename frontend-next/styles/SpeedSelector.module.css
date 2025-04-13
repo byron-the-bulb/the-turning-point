@@ -1,0 +1,20 @@
+.speedSelector {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.speedSelector label {
+  font-weight: 500;
+  min-width: 100px;
+}
+
+.speedSelect {
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background-color: white;
+  font-size: 14px;
+  min-width: 200px;
+}
