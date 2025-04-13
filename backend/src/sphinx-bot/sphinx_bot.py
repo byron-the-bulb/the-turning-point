@@ -34,6 +34,7 @@ from uuid import uuid4
 from pipecat.utils.time import time_now_iso8601
 import json
 import base64
+from daily import DailyRESTHelper
 
 
 load_dotenv(override=True)
@@ -177,6 +178,7 @@ async def run_bot(room_url, token, identifier, data=None):
     
     stt = WhisperSTTService(
             api_key=os.getenv("OPENAI_API_KEY"),
+            device="cuda",
             model=Model.DISTIL_MEDIUM_EN
         )
 
@@ -290,11 +292,33 @@ async def run_bot(room_url, token, identifier, data=None):
 
     @transport.event_handler("on_participant_left")
     async def on_participant_left(transport, participant, reason):
-        # Close the status updater session
-        await status_updater.close()
-        
-        # Cancel the pipeline, which stops processing and removes the bot from the room
-        await task.cancel()
+        logger.info(f"Participant left: {participant['id']}, reason: {reason}")
+        try:           
+            if room_url:
+                # Initialize Daily REST helper
+
+                daily_rest = DailyRESTHelper(
+                    daily_api_key=os.getenv("DAILY_API_KEY", ""),
+                    daily_api_url=os.getenv("DAILY_API_URL", "https://api.daily.co/v1"),
+                )
+
+                logger.info(f"Deleting Daily room: {room_url}")
+                try:
+                    success = await daily_rest.delete_room_by_url(room_url)
+                    if success:
+                        logger.info(f"Successfully deleted room: {room_url}")
+                    else:
+                        logger.error(f"Failed to delete room: {room_url}")
+                except Exception as e:
+                    logger.error(f"Error deleting Daily room: {e}")
+        except Exception as e:
+            logger.error(f"Error in on_participant_left: {e}")
+        finally:
+            # Close the status updater session
+            await status_updater.close()
+            
+            # Cancel the pipeline, which stops processing and removes the bot from the room
+            await task.cancel()
 
     runner = PipelineRunner()
     await runner.run(task)

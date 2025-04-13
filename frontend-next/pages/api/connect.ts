@@ -13,7 +13,7 @@ const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY;
 const DAILY_API_KEY = process.env.DAILY_API_KEY;
 
 // Pod template ID for the Sphinx bot
-const SPHINX_TEMPLATE_ID = 'sphinx-voice-bot-template';
+const SPHINX_TEMPLATE_ID = process.env.NEXT_PUBLIC_RUNPOD_TEMPLATE_ID;
 
 /**
  * Creates a Daily.co room and returns the room URL and token
@@ -79,6 +79,22 @@ async function createDailyRoom(): Promise<{ roomUrl: string; token: string }> {
  */
 async function launchRunPodInstance(roomUrl: string, token: string): Promise<string> {
   try {
+    // Get API keys from environment variables
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+    const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
+    const HUME_API_KEY = process.env.HUME_API_KEY || '';
+    const CARTESIA_API_KEY = process.env.CARTESIA_API_KEY || '';
+    
+    // Unique identifier for this instance
+    const IDENTIFIER = `pod-${Date.now()}`;
+    
+    // Optional TTS config
+    const ttsConfig = JSON.stringify({
+      provider: 'cartesia',
+      voiceId: process.env.DEFAULT_VOICE_ID || 'ec58877e-44ae-4581-9078-a04225d42bd4',
+      emotion: null
+    });
+    
     // GraphQL query to create a RunPod pod
     const query = `
       mutation {
@@ -91,7 +107,13 @@ async function launchRunPodInstance(roomUrl: string, token: string): Promise<str
             containerDiskInGb: 40,
             env: [
               { key: "DAILY_ROOM_URL", value: "${roomUrl}" },
-              { key: "DAILY_TOKEN", value: "${token}" }
+              { key: "DAILY_TOKEN", value: "${token}" },
+              { key: "IDENTIFIER", value: "${IDENTIFIER}" },
+              { key: "OPENAI_API_KEY", value: "${OPENAI_API_KEY}" },
+              { key: "ELEVENLABS_API_KEY", value: "${ELEVENLABS_API_KEY}" },
+              { key: "HUME_API_KEY", value: "${HUME_API_KEY}" },
+              { key: "CARTESIA_API_KEY", value: "${CARTESIA_API_KEY}" },
+              { key: "TTS_CONFIG", value: "${ttsConfig}" }
             ]
           }
         ) {
