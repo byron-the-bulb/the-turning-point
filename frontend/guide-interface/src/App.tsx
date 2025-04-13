@@ -65,15 +65,16 @@ interface VoiceBotProps {
   setStatusText: React.Dispatch<React.SetStateAction<string>>;
   setParticipantId: React.Dispatch<React.SetStateAction<string | undefined>>;
   setUIOverride: React.Dispatch<React.SetStateAction<any>>;
-  pendingUIOverride: any | null;
+  pendingUIOverrideRef: React.MutableRefObject<any | null>;
   setPendingUIOverride: React.Dispatch<React.SetStateAction<any | null>>;
   setConversationStatus: React.Dispatch<React.SetStateAction<String | null>>;
   ttsConfig: any;
 }
 
-const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpeaking, setStatusText, setParticipantId, setUIOverride, pendingUIOverride, setPendingUIOverride, setConversationStatus, ttsConfig }: VoiceBotProps) => {
+const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpeaking, setStatusText, setParticipantId, setUIOverride, pendingUIOverrideRef, setPendingUIOverride, setConversationStatus, ttsConfig }: VoiceBotProps) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const eventHandlersAttached = useRef(false);
   const initialMessageSent = useRef(false);
 
   // Log mounting and unmounting for debugging
@@ -97,6 +98,10 @@ const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpe
   // Define event handler functions
   const setupEventHandlers = (client: RTVIClient) => {
     console.log("Setting up Pipecat event handlers");
+    if (eventHandlersAttached.current) {
+      return;
+    }
+    eventHandlersAttached.current = true;
 
     const handleTextResponse = (text : BotLLMTextData) => {
       console.log('Received text response:', text);
@@ -163,10 +168,10 @@ const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpe
             setPendingUIOverride(event.ui_override);
           }
         } else if (event.trigger === "UIOverride") {
-          console.log('UI override trigger received');
-          if (pendingUIOverride) {
-            console.log('Setting UI override:', pendingUIOverride);
-            setUIOverride(pendingUIOverride);
+          console.log('UI override trigger received, pendingUIOverride:', pendingUIOverrideRef.current);
+          if (pendingUIOverrideRef.current) {
+            console.log('Setting UI override:', pendingUIOverrideRef.current);
+            setUIOverride(pendingUIOverrideRef.current);
             setPendingUIOverride(null);
             setIsWaitingForUser(true);
           }
@@ -231,6 +236,7 @@ const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpe
       client.off(RTVIEvent.BotStoppedSpeaking, handleBotStoppedSpeaking);
       client.off(RTVIEvent.UserStartedSpeaking, handleUserStartedSpeaking);
       client.off(RTVIEvent.UserStoppedSpeaking, handleUserStoppedSpeaking);
+      eventHandlersAttached.current = false;
     };
   };
 
@@ -257,7 +263,9 @@ const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpe
       console.error('Failed to connect:', err);
       setStatusText(`Connection error: ${err.message}`);
       setIsConnecting(false);
-      cleanup(); // Clean up event handlers if connection fails
+      if (cleanup) {
+        cleanup(); // Clean up event handlers if connection fails
+      }
     });
   }, [ttsConfig]);
 
@@ -301,11 +309,24 @@ function App() {
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
   const [uiOverride, setUIOverride] = useState<any | null>(null);
   const [pendingUIOverride, setPendingUIOverride] = useState<any | null>(null);
+  const pendingUIOverrideRef = useRef<any | null>(null); 
   const [selectedVoiceId, setSelectedVoiceId] = useState(defaultTtsConfig.voiceId);
   const [ttsConfig, setTtsConfig] = useState(defaultTtsConfig);
 
-  // No need to check for client initialization since we'll create it on demand
-  
+  // Custom setter to log all updates to pendingUIOverride
+  const logSetPendingUIOverride = useCallback((newValue: any | null) => {
+    setPendingUIOverride((prev: any | null) => {
+      console.log('pendingUIOverride updated from:', prev, 'to:', newValue);
+      pendingUIOverrideRef.current = newValue; // Update ref synchronously
+      return newValue;
+    });
+  }, []);
+
+  // useEffect to catch any change to pendingUIOverride, including state rebuilds
+  useEffect(() => {
+    console.log('pendingUIOverride changed to:', pendingUIOverride);
+  }, [pendingUIOverride]);
+
   // Handle voice selection
   const handleVoiceSelect = useCallback((voiceId: string) => {
     console.log('Voice selected:', voiceId);
@@ -381,8 +402,8 @@ function App() {
         setStatusText={setStatusText}
         setParticipantId={setParticipantId}
         setUIOverride={setUIOverride}
-        pendingUIOverride={pendingUIOverride}
-        setPendingUIOverride={setPendingUIOverride}
+        pendingUIOverrideRef={pendingUIOverrideRef}
+        setPendingUIOverride={logSetPendingUIOverride}
         setConversationStatus={setConversationStatus}
         ttsConfig={ttsConfig}
       />
