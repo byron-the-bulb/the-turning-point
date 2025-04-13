@@ -208,7 +208,7 @@ async def run_bot(room_url, token, identifier, data=None):
     messages = [
         {
             "role": "system",
-            "content": "You are Sphinx, a helpful and friendly voice assistant. Keep your responses concise and conversational.",
+            "content": "You are Sphinx, a wise, helpful and friendly voice assistant. Keep your responses concise and conversational. Speak slowly and calmly. Always call the provided functions, never skip.",
         },
     ]
 

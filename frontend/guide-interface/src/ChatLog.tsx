@@ -24,6 +24,7 @@ interface ChatLogProps {
 
 const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpeaking, uiOverride }) => {
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const uiOverrideRef = useRef<HTMLDivElement>(null);
   const client = useRTVIClient();
   const [selectedOption, setSelectedOption] = useState('');
   // Auto-scroll to bottom when new messages arrive
@@ -32,6 +33,13 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpe
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+  // Scroll to UI override when it appears
+  useEffect(() => {
+    if (uiOverride && uiOverrideRef.current) {
+      uiOverrideRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [uiOverride]);
 
   const handleButtonClick = async () => {
     if (client && uiOverride?.type === 'button') {
@@ -84,7 +92,7 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpe
           >
             <div className="message-header">
               <span className="message-type">
-                {message.type === 'user' ? 'You' : 
+                {message.type === 'user' ? 'Participant' : 
                  message.type === 'guide' ? 'Sphinx' : 
                  message.type === 'system' ? 'System' : 'Status'}
               </span>
@@ -96,7 +104,7 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpe
           </div>
         ))}
         {uiOverride && (
-          <div className="ui-override-container">
+          <div className="ui-override-container" ref={uiOverrideRef}>
             {uiOverride.type === 'button' && (
               <div>
                 <p>{uiOverride.prompt}</p>

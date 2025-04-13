@@ -8,7 +8,10 @@ import {
   useRTVIClient
 } from '@pipecat-ai/client-react';
 import { DailyTransport } from '@pipecat-ai/daily-transport';
+import VoiceSettingsPanel from './VoiceSettingsPanel';
 import VoiceSelector from './VoiceSelector';
+import LoadingSpinner from './LoadingSpinner';
+import { TTSConfig } from './types';
 
 // Generate a truly unique ID for messages
 function generateUniqueId() {
@@ -23,13 +26,13 @@ const CARTESIA_API_KEY = process.env.REACT_APP_CARTESIA_API_KEY || '';
 console.log("API URL:", API_URL)
 
 // Default TTS configuration
-const defaultTtsConfig = {
+const defaultTtsConfig: TTSConfig = {
   provider: 'cartesia',
   voiceId: '146485fd-8736-41c7-88a8-7cdd0da34d84', // Default voice ID
   model: 'sonic-2-2025-03-07',
   language: 'en',
-  speed: 'slowest',
-  emotion: ['curiosity:high']
+  speed: 'slow',
+  emotion: null
 };
 
 // Function to create a Pipecat client with the given TTS configuration
@@ -68,12 +71,13 @@ interface VoiceBotProps {
   pendingUIOverrideRef: React.MutableRefObject<any | null>;
   setPendingUIOverride: React.Dispatch<React.SetStateAction<any | null>>;
   setConversationStatus: React.Dispatch<React.SetStateAction<String | null>>;
-  ttsConfig: any;
+  ttsConfig: TTSConfig;
 }
 
 const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpeaking, setStatusText, setParticipantId, setUIOverride, pendingUIOverrideRef, setPendingUIOverride, setConversationStatus, ttsConfig }: VoiceBotProps) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isWaitingForParticipant, setIsWaitingForParticipant] = useState(false);
   const eventHandlersAttached = useRef(false);
   const initialMessageSent = useRef(false);
 
@@ -126,6 +130,8 @@ const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpe
       setIsConnected(true);
       setIsConnecting(false);
       addChatMessage('Connected to the Sphinx Voice Bot server', 'system');
+      // We're now waiting for a participant to join
+      setIsWaitingForParticipant(true);
     };
 
     const handleBotConnected = (participant: any) => {
@@ -133,6 +139,8 @@ const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpe
       if (participant?.id) {
         console.log('Setting participant ID:', participant.id);
         setParticipantId(participant.id);
+        // Participant has joined, no longer waiting
+        setIsWaitingForParticipant(false);
       }
     };
 
@@ -151,6 +159,7 @@ const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpe
       setUIOverride(null);
       setIsConnected(false);
       setIsConnecting(false);
+      setIsWaitingForParticipant(false);
       addChatMessage('Disconnected from the server', 'system');
       setIsWaitingForUser(false);
     };
@@ -184,6 +193,7 @@ const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpe
       setStatusText(`Error: ${error.message || 'Unknown error'}`);
       addChatMessage(`Error: ${error.message || 'Unknown error'}`, 'system');
       setIsConnecting(false);
+      setIsWaitingForParticipant(false);
     };
 
     const handleBotStoppedSpeaking = () => {
@@ -281,20 +291,26 @@ const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpe
   }, []);
 
   return (
-    <div className="controls">
-      <button
-        onClick={handleStartConnection}
-        disabled={isConnected || isConnecting}
-      >
-        {isConnecting ? 'Connecting...' : 'Start Conversation'}
-      </button>
-      <button
-        onClick={handleStopConnection}
-        disabled={!isConnected}
-      >
-        Stop Conversation
-      </button>
-    </div>
+    <>
+      <div className="controls">
+        <button
+          onClick={handleStartConnection}
+          disabled={isConnected || isConnecting}
+        >
+          {isConnecting ? 'Connecting...' : 'Start Experience'}
+        </button>
+        <button
+          onClick={handleStopConnection}
+          disabled={!isConnected}
+        >
+          Stop Experience
+        </button>
+      </div>
+      
+      {(isConnecting || isWaitingForParticipant) && (
+        <LoadingSpinner message="Waiting for Sphinx to join..." />
+      )}
+    </>
   );
 });
 
@@ -311,7 +327,9 @@ function App() {
   const [pendingUIOverride, setPendingUIOverride] = useState<any | null>(null);
   const pendingUIOverrideRef = useRef<any | null>(null); 
   const [selectedVoiceId, setSelectedVoiceId] = useState(defaultTtsConfig.voiceId);
-  const [ttsConfig, setTtsConfig] = useState(defaultTtsConfig);
+  const [selectedSpeed, setSelectedSpeed] = useState(defaultTtsConfig.speed);
+  const [selectedEmotions, setSelectedEmotions] = useState<string[] | null>(defaultTtsConfig.emotion);
+  const [ttsConfig, setTtsConfig] = useState<TTSConfig>(defaultTtsConfig);
 
   // Custom setter to log all updates to pendingUIOverride
   const logSetPendingUIOverride = useCallback((newValue: any | null) => {
@@ -343,6 +361,32 @@ function App() {
     // This would be handled when the user clicks the Start Conversation button again
   }, [ttsConfig]);
 
+  // Handle speed selection
+  const handleSpeedSelect = useCallback((speed: string) => {
+    console.log('Speed selected:', speed);
+    setSelectedSpeed(speed);
+    
+    // Update the TTS config with the new speed
+    const newTtsConfig = {
+      ...ttsConfig,
+      speed
+    };
+    setTtsConfig(newTtsConfig);
+  }, [ttsConfig]);
+
+  // Handle emotions change
+  const handleEmotionsChange = useCallback((emotions: string[] | null) => {
+    console.log('Emotions changed:', emotions);
+    setSelectedEmotions(emotions);
+    
+    // Update the TTS config with the new emotions
+    const newTtsConfig = {
+      ...ttsConfig,
+      emotion: emotions
+    };
+    setTtsConfig(newTtsConfig);
+  }, [ttsConfig]);
+
   const addChatMessage = useCallback((text: string, type: MessageType) => {
     if (!text) return;
     console.log(`Adding ${type} message: ${text}`);
@@ -372,11 +416,20 @@ function App() {
       <h1>Sphinx Voice Bot Interface</h1>
       <h3><div id="statusText">{statusText}</div></h3>
 
-      <div className="voice-selection-container">
-        <VoiceSelector 
-          onVoiceSelect={handleVoiceSelect} 
-          initialVoiceId={selectedVoiceId}
-          apiKey={CARTESIA_API_KEY}
+      <div className="voice-settings-container">
+        <div className="voice-selection-container">
+          <VoiceSelector 
+            onVoiceSelect={handleVoiceSelect} 
+            initialVoiceId={selectedVoiceId}
+            apiKey={CARTESIA_API_KEY}
+          />
+        </div>
+        
+        <VoiceSettingsPanel
+          selectedSpeed={selectedSpeed}
+          selectedEmotions={selectedEmotions}
+          onSpeedSelect={handleSpeedSelect}
+          onEmotionsChange={handleEmotionsChange}
         />
       </div>
 
