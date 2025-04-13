@@ -153,15 +153,16 @@ const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpe
     const handleServerMessage = (event: any) => {
       console.log('Server message received:', event);
       if (event) {
+        //its either status or trigger. TODO : Make this better
         if (event.status) {
           addChatMessage(event.status, 'system');
           setConversationStatus(event.status_context?.node || null);
-        }
-        if (event.ui_override) {
-          console.log('UI override received:', event.ui_override);
-          setPendingUIOverride(event.ui_override);
-        }
-        if (event.trigger === "UIOverride") {
+        
+          if (event.ui_override) {
+            console.log('UI override received:', event.ui_override);
+            setPendingUIOverride(event.ui_override);
+          }
+        } else if (event.trigger === "UIOverride") {
           console.log('UI override trigger received');
           if (pendingUIOverride) {
             console.log('Setting UI override:', pendingUIOverride);
