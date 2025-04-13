@@ -16,11 +16,11 @@ function generateUniqueId() {
 }
 
 // Server URL constants
-const API_URL = 'http://localhost:8765';
-const API_WS_URL = 'ws://localhost:8765';
-
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8765';
+const API_WS_URL = process.env.REACT_APP_API_WS_URL || 'ws://localhost:8765';
 // Cartesia API key - in production, this should be stored in environment variables
 const CARTESIA_API_KEY = process.env.REACT_APP_CARTESIA_API_KEY || '';
+console.log("API URL:", API_URL)
 
 // Default TTS configuration
 const defaultTtsConfig = {
@@ -78,7 +78,8 @@ const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpe
 
   // Log mounting and unmounting for debugging
   useEffect(() => {
-    console.log("VoiceBot mounted");
+    console.log("VoiceBot mounted blah, blah!");
+    console.log("API URL:", API_URL);
     return () => {
       console.log("VoiceBot unmounted");
     };
