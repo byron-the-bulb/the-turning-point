@@ -28,7 +28,7 @@ console.log("API URL:", API_URL)
 // Default TTS configuration
 const defaultTtsConfig: TTSConfig = {
   provider: 'cartesia',
-  voiceId: '146485fd-8736-41c7-88a8-7cdd0da34d84', // Default voice ID
+  voiceId: 'ec58877e-44ae-4581-9078-a04225d42bd4', // Default voice ID
   model: 'sonic-2-2025-03-07',
   language: 'en',
   speed: 'slow',

@@ -36,11 +36,7 @@ const VoiceSelector: React.FC<VoiceSelectorProps> = ({ onVoiceSelect, initialVoi
         const allVoices = await client.voices.list();
         
         // Filter for American English voices
-        const americanVoices = allVoices.filter(voice => 
-          voice.language === 'en' && 
-          (voice.description?.toLowerCase().includes('american') || 
-           voice.name?.toLowerCase().includes('american'))
-        );
+        const americanVoices = allVoices.filter(voice => voice.language === 'en');
         
         setVoices(americanVoices);
         
