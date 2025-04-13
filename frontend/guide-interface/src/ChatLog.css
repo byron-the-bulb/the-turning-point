@@ -138,3 +138,58 @@
 .message-status .message-type {
   color: #757575;
 }
+
+.ui-override-container {
+  background-color: #f0f0f0; /* Light background to distinguish from chat */
+  border: 1px solid #ccc; /* Subtle border for separation */
+  border-radius: 5px; /* Rounded corners for a softer look */
+  padding: 15px; /* Space inside the container */
+  margin: 10px 0; /* Space above and below the container */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* Align items to the left */
+}
+
+.ui-override-container p {
+  margin: 0 0 10px 0; /* Space below the prompt text */
+  font-size: 16px; /* Readable font size */
+  color: #333; /* Dark text for contrast */
+}
+
+.ui-override-container button {
+  background-color: #007bff; /* Blue background for buttons */
+  color: white; /* White text for contrast */
+  border: none;
+  border-radius: 3px;
+  padding: 8px 12px;
+  cursor: pointer;
+  margin-top: 10px; /* Space above the button */
+}
+
+.ui-override-container button:hover {
+  background-color: #0056b3; /* Darker blue on hover */
+}
+
+.ui-override-container select {
+  width: 100%; /* Full width for dropdown */
+  padding: 8px;
+  margin-top: 10px; /* Space above the dropdown */
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+/* Media query for smaller screens */
+@media (max-width: 600px) {
+  .ui-override-container {
+    padding: 10px; /* Less padding on small screens */
+  }
+
+  .ui-override-container p {
+    font-size: 14px; /* Smaller text on small screens */
+  }
+
+  .ui-override-container button,
+  .ui-override-container select {
+    width: 100%; /* Full width for buttons and dropdowns */
+  }
+}

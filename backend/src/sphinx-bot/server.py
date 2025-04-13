@@ -21,6 +21,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 import uuid
+import json
+import base64
 
 from pipecat.transports.services.helpers.daily_rest import DailyRESTHelper, DailyRoomParams
 
@@ -159,6 +161,7 @@ async def rtvi_connect(request: Request) -> Dict[Any, Any]:
     """RTVI connect endpoint that creates a room and returns connection credentials.
 
     This endpoint is called by RTVI clients to establish a connection.
+    It extracts data from the request body and passes it to the sphinx_bot subprocess.
 
     Returns:
         Dict[Any, Any]: Authentication bundle containing room_url and token
@@ -170,12 +173,29 @@ async def rtvi_connect(request: Request) -> Dict[Any, Any]:
     room_url, token = await create_room_and_token()
     print(f"Room URL: {room_url}")
 
+    # Extract data from request body
+    try:
+        request_data = await request.json()
+        print(f"Received request data: {request_data}")
+    except Exception as e:
+        print(f"Error parsing request body: {e}")
+        request_data = {}
+
     # Start the bot process with a unique identifier
-        # generate a uuid
     identifier = str(uuid.uuid4())
+    
+    # Prepare command with data from request body if available
+    cmd = f"python -m sphinx_bot -u {room_url} -t {token} -i {identifier}"
+    
+    # Add request data as a JSON-encoded command line argument if available
+    if request_data:
+        # Use base64 encoding to avoid command line escaping issues
+        encoded_data = base64.b64encode(json.dumps(request_data).encode()).decode()
+        cmd += f" -d {encoded_data}"
+    
     try:
         proc = subprocess.Popen(
-            [f"python -m sphinx_bot -u {room_url} -t {token} -i {identifier}"],
+            [cmd],
             shell=True,
             bufsize=1,
             cwd=os.path.dirname(os.path.abspath(__file__)),

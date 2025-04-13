@@ -1,5 +1,8 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
+import { useRTVIClient } from '@pipecat-ai/client-react';
+import { v4 as uuidv4 } from 'uuid';
 import './ChatLog.css';
+import { RTVIMessage } from '@pipecat-ai/client-js';
 
 // Message types
 export type MessageType = 'system' | 'user' | 'guide' | 'status';
@@ -16,17 +19,46 @@ interface ChatLogProps {
   messages: ChatMessage[];
   isWaitingForUser: boolean;
   isUserSpeaking: boolean;
+  uiOverride: any | null;
 }
 
-const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpeaking }) => {
+const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpeaking, uiOverride }) => {
   const chatEndRef = useRef<HTMLDivElement>(null);
-
+  const client = useRTVIClient();
+  const [selectedOption, setSelectedOption] = useState('');
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+  const handleButtonClick = async () => {
+    if (client && uiOverride?.type === 'button') {
+      console.log('Sending uiOverride action : ', uiOverride);
+      const action = await client.action({
+        service: 'conversation',
+        action: 'uioverride_response',
+        arguments: [
+          { name : 'message', value: uiOverride.action_text}
+        ]
+      })
+    }
+  };
+
+  const handleListSelection = () => {
+    if (client && uiOverride?.type === 'list' && selectedOption) {
+      console.log('Sending uiOverride action : ', uiOverride);
+      const action = client.action({
+        service: 'conversation',
+        action: 'uioverride_response',
+        arguments: [
+          { name : 'message', value: selectedOption}
+        ]
+      })
+      setSelectedOption(''); // Reset selection after submission
+    }
+  };
 
   return (
     <div className="chat-log">
@@ -63,10 +95,36 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpe
             <div className="message-content">{message.text}</div>
           </div>
         ))}
+        {uiOverride && (
+          <div className="ui-override-container">
+            {uiOverride.type === 'button' && (
+              <div>
+                <p>{uiOverride.prompt}</p>
+                <button onClick={handleButtonClick}>{uiOverride.action_text}</button>
+              </div>
+            )}
+            {uiOverride.type === 'list' && (
+              <div>
+                <p>{uiOverride.prompt}</p>
+                <select 
+                  value={selectedOption} 
+                  onChange={(e) => setSelectedOption(e.target.value)}
+                >
+                  <option value="">Select an option</option>
+                  {uiOverride.options.map((option: string, index: number) => (
+                    <option key={index} value={option}>{option}</option>
+                  ))}
+                </select>
+                <button onClick={handleListSelection} disabled={!selectedOption}>
+                  Submit
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         <div ref={chatEndRef} />
       </div>
     </div>
   );
 };
-
 export default ChatLog;
