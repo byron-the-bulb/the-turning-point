@@ -109,9 +109,8 @@ const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpe
       console.log('Received transcription:', transcript);
       if (transcript.text) {
         addChatMessage(transcript.text, 'user');
-        //Is this a good spot to get rid of the override?
-        setUIOverride(null);
         //setIsWaitingForUser(false);
+        setUIOverride(null);
       }
     };
 
@@ -258,7 +257,7 @@ const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpe
       setIsConnecting(false);
       cleanup(); // Clean up event handlers if connection fails
     });
-  }, [ttsConfig, setStatusText, addChatMessage, setIsWaitingForUser, setParticipantId, setUIOverride, pendingUIOverride, setPendingUIOverride, setConversationStatus, setIsUserSpeaking]);
+  }, [ttsConfig]);
 
   const handleStopConnection = useCallback(() => {
     if (!clientInstance) return;
@@ -269,7 +268,7 @@ const VoiceBot = React.memo(({ addChatMessage, setIsWaitingForUser, setIsUserSpe
       console.error('Failed to disconnect:', err);
       setStatusText(`Disconnection error: ${err.message}`);
     });
-  }, [setStatusText]);
+  }, []);
 
   return (
     <div className="controls">
