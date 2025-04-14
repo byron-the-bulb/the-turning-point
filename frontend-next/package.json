@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudwatch-logs": "^3.787.0",
     "@cartesia/cartesia-js": "^2.2.0",
     "@daily-co/daily-js": "^0.77.0",
     "@daily-co/daily-react": "^0.22.0",
