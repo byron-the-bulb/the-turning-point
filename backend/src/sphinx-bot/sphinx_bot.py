@@ -9,6 +9,10 @@ import asyncio
 import os
 import sys
 import argparse
+import time
+
+# Import our custom CloudWatch logger
+from cloudwatch_logger import setup_cloudwatch_logging
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -34,13 +38,20 @@ from uuid import uuid4
 from pipecat.utils.time import time_now_iso8601
 import json
 import base64
-from daily import DailyRESTHelper
+from pipecat.transports.services.helpers.daily_rest import DailyRESTHelper, DailyRoomParams
 
 
 load_dotenv(override=True)
 
+# Remove default logger
 logger.remove(0)
+
+# Add console logging
 logger.add(sys.stderr, level="DEBUG")
+
+# Setup CloudWatch logging using our separate module
+setup_cloudwatch_logging()
+
 
 
 class SessionTimeoutHandler:
@@ -176,9 +187,13 @@ async def run_bot(room_url, token, identifier, data=None):
     
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
     
+    # Get device from environment variable, default to cuda
+    whisper_device = os.getenv("WHISPER_DEVICE", "cuda")
+    logger.info(f"Using device for Whisper STT: {whisper_device}")
+    
     stt = WhisperSTTService(
             api_key=os.getenv("OPENAI_API_KEY"),
-            device="cuda",
+            device=whisper_device,
             model=Model.DISTIL_MEDIUM_EN
         )
 
@@ -294,23 +309,25 @@ async def run_bot(room_url, token, identifier, data=None):
     async def on_participant_left(transport, participant, reason):
         logger.info(f"Participant left: {participant['id']}, reason: {reason}")
         try:           
-            if room_url:
-                # Initialize Daily REST helper
+            if room_url and os.getenv("DAILY_API_KEY"):
+                import aiohttp
+                # Initialize Daily REST helper with proper aiohttp session
+                async with aiohttp.ClientSession() as session:
+                    daily_rest = DailyRESTHelper(
+                        daily_api_key=os.getenv("DAILY_API_KEY", ""),
+                        daily_api_url=os.getenv("DAILY_API_URL", "https://api.daily.co/v1"),
+                        aiohttp_session=session
+                    )
 
-                daily_rest = DailyRESTHelper(
-                    daily_api_key=os.getenv("DAILY_API_KEY", ""),
-                    daily_api_url=os.getenv("DAILY_API_URL", "https://api.daily.co/v1"),
-                )
-
-                logger.info(f"Deleting Daily room: {room_url}")
-                try:
-                    success = await daily_rest.delete_room_by_url(room_url)
-                    if success:
-                        logger.info(f"Successfully deleted room: {room_url}")
-                    else:
-                        logger.error(f"Failed to delete room: {room_url}")
-                except Exception as e:
-                    logger.error(f"Error deleting Daily room: {e}")
+                    logger.info(f"Deleting Daily room: {room_url}")
+                    try:
+                        success = await daily_rest.delete_room_by_url(room_url)
+                        if success:
+                            logger.info(f"Successfully deleted room: {room_url}")
+                        else:
+                            logger.error(f"Failed to delete room: {room_url}")
+                    except Exception as e:
+                        logger.error(f"Error deleting Daily room: {e}")
         except Exception as e:
             logger.error(f"Error in on_participant_left: {e}")
         finally:
@@ -319,9 +336,27 @@ async def run_bot(room_url, token, identifier, data=None):
             
             # Cancel the pipeline, which stops processing and removes the bot from the room
             await task.cancel()
+            
+            # Log that we're exiting the process
+            logger.info("Participant left, canceling pipeline task...")
+            
+            # Give a small delay to allow logs to flush
+            await asyncio.sleep(1)
+            
+            # Instead of sys.exit, raise an exception that will be caught by the outer try/except
+            # This allows for proper cleanup of resources
+            raise asyncio.CancelledError("Participant left the room")
 
-    runner = PipelineRunner()
-    await runner.run(task)
+    try:
+        runner = PipelineRunner()
+        await runner.run(task)
+    except asyncio.CancelledError:
+        logger.info("Pipeline runner cancelled, shutting down gracefully...")
+    except Exception as e:
+        logger.error(f"Error in pipeline runner: {e}")
+        # Exit with error code
+        import sys
+        sys.exit(1)
 
 
 if __name__ == "__main__":
