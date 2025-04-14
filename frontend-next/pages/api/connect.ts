@@ -386,31 +386,13 @@ async function attemptRunPodLaunch(roomUrl: string, token: string, ttsConfig: an
 /**
  * API handler to create a Daily room and launch a RunPod instance
  */
-// Helper function to add CORS headers to response
-const setCorsHeaders = (res: NextApiResponse) => {
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Replace with your specific origins in production
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
-};
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ResponseData>
 ) {
-  // Handle OPTIONS request for CORS preflight
-  if (req.method === 'OPTIONS') {
-    setCorsHeaders(res);
-    return res.status(200).end();
-  }
-  
-  // Set CORS headers for all responses
-  setCorsHeaders(res);
-
-  logger.log('API request received');
+  await logger.log('API request received');
+  await logger.log('Available environment variables:', Object.keys(process.env).join(', '));
   // Add a timeout to ensure the request doesn't hang indefinitely
   const requestTimeout = setTimeout(async () => {
     if (!res.writableEnded) {
