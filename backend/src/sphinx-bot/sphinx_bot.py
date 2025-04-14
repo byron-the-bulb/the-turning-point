@@ -157,6 +157,8 @@ async def run_bot(room_url, token, identifier, data=None):
     """
     logger.info(f"Starting Sphinx bot in room {room_url} with identifier {identifier}")
     
+    # print all env variables
+    logger.info(f"All environment variables: {dict(os.environ)}")
     # Parse the data if provided
     logger.info(f"Received data: {data}")
     config_data = {}
@@ -188,13 +190,13 @@ async def run_bot(room_url, token, identifier, data=None):
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
     
     # Get device from environment variable, default to cuda
-    whisper_device = os.getenv("WHISPER_DEVICE", "cuda")
-    logger.info(f"Using device for Whisper STT: {whisper_device}")
+    sphinx_whisper_device = os.getenv("SPHINX_WHISPER_DEVICE", "cuda")
+    logger.info(f"Using device for Whisper STT (SPHINX_WHISPER_DEVICE): {sphinx_whisper_device}")
     
     stt = WhisperSTTService(
             api_key=os.getenv("OPENAI_API_KEY"),
-            device=whisper_device,
-            model=Model.DISTIL_MEDIUM_EN
+            device=sphinx_whisper_device,
+            model=Model.MEDIUM
         )
 
     tts = None

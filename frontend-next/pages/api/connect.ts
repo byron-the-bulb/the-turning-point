@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
-import uuid from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 
 type ResponseData = {
   room_url?: string;
@@ -20,11 +20,7 @@ const SPHINX_TEMPLATE_ID = process.env.NEXT_PUBLIC_RUNPOD_TEMPLATE_ID;
  * Creates a Daily.co room and returns the room URL and token
  */
 async function createDailyRoom(): Promise<{ roomUrl: string; token: string }> {
-  // Set a timeout to prevent long-running requests
-  const timeout = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error('Daily.co API request timed out')), 15000); // 15 seconds timeout
-  });
-  
+ 
   try {
     // Create a new Daily.co room
     const roomResponse = await axios.post(
@@ -188,17 +184,17 @@ async function attemptRunPodLaunch(roomUrl: string, token: string, ttsConfig: an
     const CLOUDWATCH_LOG_GROUP = process.env.CLOUDWATCH_LOG_GROUP || '/sphinx-voice-bot';
     
     // Get Whisper device configuration
-    const WHISPER_DEVICE = process.env.WHISPER_DEVICE || 'cuda';
+    const SPHINX_WHISPER_DEVICE = process.env.SPHINX_WHISPER_DEVICE || 'cuda';
     
     // Unique identifier for this instance
-    const IDENTIFIER = `pod-${uuid.v4()}`;
+    const IDENTIFIER = `pod-${uuidv4()}`;
     
     // Format and prepare TTS config from client request or use default
     const formattedTtsConfig = JSON.stringify({
       "tts": ttsConfig || {
         provider: 'cartesia',
         voiceId: process.env.DEFAULT_VOICE_ID || 'ec58877e-44ae-4581-9078-a04225d42bd4',
-        model: process.env.DEFAULT_TTS_MODEL || 'custom',
+        model: process.env.DEFAULT_TTS_MODEL || 'sonic-turbo-2025-03-07',
         speed: process.env.DEFAULT_TTS_SPEED || 1.0,
         emotion: null
       }
@@ -242,7 +238,7 @@ async function attemptRunPodLaunch(roomUrl: string, token: string, ttsConfig: an
             { key: "AWS_SECRET_ACCESS_KEY", value: "${escapeValue(AWS_SECRET_ACCESS_KEY)}" },
             { key: "AWS_REGION", value: "${escapeValue(AWS_REGION)}" },
             { key: "CLOUDWATCH_LOG_GROUP", value: "${escapeValue(CLOUDWATCH_LOG_GROUP)}" },
-            { key: "WHISPER_DEVICE", value: "${escapeValue(WHISPER_DEVICE)}" }
+            { key: "SPHINX_WHISPER_DEVICE", value: "${escapeValue(SPHINX_WHISPER_DEVICE)}" }
           ]
         }
       ) {
@@ -291,6 +287,7 @@ async function attemptRunPodLaunch(roomUrl: string, token: string, ttsConfig: an
     console.log(`RunPod instance launched successfully with configuration: GPU=${currentConfig.gpuTypeId}, vCPUs=${currentConfig.minVcpuCount}, Memory=${currentConfig.minMemoryInGb}GB`, podId);
     return podId;
   } catch (error) {
+    console.error('Error launching RunPod instance:', error);
     // Special case for exhausting all configurations
     if (error instanceof Error && error.message === 'No instances available for any of the configured options') {
       throw error;

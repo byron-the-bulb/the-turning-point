@@ -37,13 +37,20 @@ RUN python3 -c "from faster_whisper import WhisperModel; model = WhisperModel('m
 # Copy application code from the sphinx-bot directory
 COPY src/sphinx-bot/ /app/
 
+# Copy the pod termination script
+COPY scripts/terminate_pod.sh /app/
+# Make the termination script executable
+RUN chmod +x /app/terminate_pod.sh
+
 # Create an entry point script that accepts environment variables
 RUN echo '#!/bin/bash\n\
 python3 -m sphinx_bot \
     -u "${DAILY_ROOM_URL}" \
     -t "${DAILY_TOKEN}" \
     -i "${IDENTIFIER}" \
-    ${TTS_CONFIG:+-d "${TTS_CONFIG}"}\
+    ${TTS_CONFIG:+-d "${TTS_CONFIG}"}\n\
+# Shut down the RunPod container when the process exits\n\
+/app/terminate_pod.sh\n\
 ' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Command to run when container starts
