@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { CloudWatchLogsClient, PutLogEventsCommand } from '@aws-sdk/client-cloudwatch-logs';
 
 // CloudWatch Logs configuration
-const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
+const AWS_REGION = process.env.MY_AWS_REGION || 'us-east-1';
 const CLOUDWATCH_LOG_GROUP = process.env.CLOUDWATCH_LOG_GROUP || '/sphinx-voice-bot';
 const CLOUDWATCH_LOG_STREAM = `api-connect-${new Date().toISOString().split('T')[0]}`;
 
@@ -12,16 +12,10 @@ const CLOUDWATCH_LOG_STREAM = `api-connect-${new Date().toISOString().split('T')
 let cloudWatchLogsClient: CloudWatchLogsClient | null = null;
 let logSequenceToken: string | undefined;
 
-// Initialize CloudWatch Logs client if credentials are available
-if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
-  cloudWatchLogsClient = new CloudWatchLogsClient({
-    region: AWS_REGION,
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-    }
-  });
-}
+// Initialize CloudWatch Logs client
+cloudWatchLogsClient = new CloudWatchLogsClient({
+  region: AWS_REGION,
+});
 
 // Custom logger that logs to both console and CloudWatch
 const logger = {
@@ -251,9 +245,9 @@ async function attemptRunPodLaunch(roomUrl: string, token: string, ttsConfig: an
     const CARTESIA_API_KEY = process.env.CARTESIA_API_KEY || '';
     
     // Get AWS CloudWatch configuration
-    const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID || '';
-    const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY || '';
-    const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
+    const MY_AWS_ACCESS_KEY_ID = process.env.MY_AWS_ACCESS_KEY_ID || '';
+    const MY_AWS_SECRET_ACCESS_KEY = process.env.MY_AWS_SECRET_ACCESS_KEY || '';
+    const MY_AWS_REGION = process.env.MY_AWS_REGION || 'us-east-1';
     const CLOUDWATCH_LOG_GROUP = process.env.CLOUDWATCH_LOG_GROUP || '/sphinx-voice-bot';
     
     // Get Whisper device configuration
@@ -307,9 +301,9 @@ async function attemptRunPodLaunch(roomUrl: string, token: string, ttsConfig: an
             { key: "HUME_API_KEY", value: "${escapeValue(HUME_API_KEY)}" },
             { key: "CARTESIA_API_KEY", value: "${escapeValue(CARTESIA_API_KEY)}" },
             { key: "TTS_CONFIG", value: "${escapeValue(base64TtsConfig)}" },
-            { key: "AWS_ACCESS_KEY_ID", value: "${escapeValue(AWS_ACCESS_KEY_ID)}" },
-            { key: "AWS_SECRET_ACCESS_KEY", value: "${escapeValue(AWS_SECRET_ACCESS_KEY)}" },
-            { key: "AWS_REGION", value: "${escapeValue(AWS_REGION)}" },
+            { key: "AWS_ACCESS_KEY_ID", value: "${escapeValue(MY_AWS_ACCESS_KEY_ID)}" },
+            { key: "AWS_SECRET_ACCESS_KEY", value: "${escapeValue(MY_AWS_SECRET_ACCESS_KEY)}" },
+            { key: "AWS_REGION", value: "${escapeValue(MY_AWS_REGION)}" },
             { key: "CLOUDWATCH_LOG_GROUP", value: "${escapeValue(CLOUDWATCH_LOG_GROUP)}" },
             { key: "SPHINX_WHISPER_DEVICE", value: "${escapeValue(SPHINX_WHISPER_DEVICE)}" }
           ]
