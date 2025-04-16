@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     libcudnn9-cuda-12 \
     libcublas-12-1 \
+    awscli \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements.txt
@@ -28,12 +29,6 @@ RUN pip3 install --no-cache-dir ctranslate2 faster-whisper -r requirements.txt
 # Create directories for whisper models
 RUN mkdir -p /root/.cache/whisper
 
-# Download and cache the Whisper medium model
-RUN wget -q https://openaipublic.azureedge.net/main/whisper/models/345ae4da62f9b3d59415adc60127b97c714f32e89e936602e85993674d08dcb1/medium.pt -O /root/.cache/whisper/medium.pt
-
-# Verify model is properly downloaded and can be loaded with faster-whisper
-RUN python3 -c "from faster_whisper import WhisperModel; model = WhisperModel('medium'); print('Successfully loaded faster-whisper medium model')"
-
 # Copy application code from the sphinx-bot directory
 COPY src/sphinx-bot/ /app/
 
@@ -44,13 +39,26 @@ RUN chmod +x /app/terminate_pod.sh
 
 # Create an entry point script that accepts environment variables
 RUN echo '#!/bin/bash\n\
-python3 -m sphinx_bot \
+# Create log directory\n\
+mkdir -p /app/logs\n\
+\n\
+# Execute the Python command and redirect stdout/stderr to log file\n\
+python3 -u -m sphinx_bot \
     -u "${DAILY_ROOM_URL}" \
     -t "${DAILY_TOKEN}" \
     -i "${IDENTIFIER}" \
-    ${TTS_CONFIG:+-d "${TTS_CONFIG}"}\n\
+    ${TTS_CONFIG:+-d "${TTS_CONFIG}"} 2>&1 | tee /app/logs/sphinx_bot.log\n\
+\n\
+# Store the exit code of the Python process\n\
+EXIT_CODE=${PIPESTATUS[0]}\n\
+\n\
+echo "Python process exited with code $EXIT_CODE. Capturing logs for upload..."\n\
+\n\
 # Shut down the RunPod container when the process exits\n\
 /app/terminate_pod.sh\n\
+\n\
+# Exit with the same code as the Python process\n\
+exit $EXIT_CODE\n\
 ' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Command to run when container starts

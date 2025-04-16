@@ -149,6 +149,8 @@ def setup_cloudwatch_logging():
     # Define a unique log stream name using the bot identifier or timestamp
     bot_identifier = os.getenv("IDENTIFIER", f"bot-{int(time.time())}")
     log_stream = f"{bot_identifier}-{int(time.time())}"
+    #save log_stream name to env variable
+    os.environ["LOG_STREAM"] = log_stream
     
     # Setup CloudWatch logging if AWS credentials are provided
     if aws_access_key and aws_secret_key:

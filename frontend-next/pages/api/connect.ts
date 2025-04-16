@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { CloudWatchLogsClient, PutLogEventsCommand } from '@aws-sdk/client-cloudwatch-logs';
+import { CloudWatchLogsClient, PutLogEventsCommand, CreateLogGroupCommand, CreateLogStreamCommand, DescribeLogStreamsCommand } from '@aws-sdk/client-cloudwatch-logs';
 
 // CloudWatch Logs configuration
 const AWS_REGION = process.env.MY_AWS_REGION || 'us-east-1';
@@ -15,7 +15,19 @@ let logSequenceToken: string | undefined;
 // Initialize CloudWatch Logs client
 cloudWatchLogsClient = new CloudWatchLogsClient({
   region: AWS_REGION,
+  credentials : {
+    accessKeyId: process.env.MY_AWS_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.MY_AWS_SECRET_ACCESS_KEY || ''
+  }
 });
+
+// Initialize logs if we have a client
+if (cloudWatchLogsClient) {
+  initializeCloudWatchLogs().catch(err => {
+    console.error('Failed to initialize CloudWatch logging:', err);
+    // Don't fail the application if CloudWatch setup fails
+  });
+}
 
 // Custom logger that logs to both console and CloudWatch
 const logger = {
@@ -39,6 +51,62 @@ const logger = {
   }
 };
 
+// Initialize CloudWatch log group and stream
+async function initializeCloudWatchLogs() {
+  if (!cloudWatchLogsClient) return;
+  
+  try {
+    // Check if log group exists, create if it doesn't
+    try {
+      await cloudWatchLogsClient.send(new CreateLogGroupCommand({
+        logGroupName: CLOUDWATCH_LOG_GROUP
+      }));
+      console.log(`Created log group: ${CLOUDWATCH_LOG_GROUP}`);
+    } catch (error: any) {
+      // Ignore error if log group already exists
+      if (error.name !== 'ResourceAlreadyExistsException') {
+        console.error(`Error creating log group: ${error.message}`);
+      }
+    }
+    
+    // Check if log stream exists
+    try {
+      const streamsResponse = await cloudWatchLogsClient.send(new DescribeLogStreamsCommand({
+        logGroupName: CLOUDWATCH_LOG_GROUP,
+        logStreamNamePrefix: CLOUDWATCH_LOG_STREAM
+      }));
+      
+      // Check if our stream exists in the response
+      const streamExists = streamsResponse.logStreams?.some(
+        stream => stream.logStreamName === CLOUDWATCH_LOG_STREAM
+      );
+      
+      // If stream doesn't exist, create it
+      if (!streamExists) {
+        await cloudWatchLogsClient.send(new CreateLogStreamCommand({
+          logGroupName: CLOUDWATCH_LOG_GROUP,
+          logStreamName: CLOUDWATCH_LOG_STREAM
+        }));
+        console.log(`Created log stream: ${CLOUDWATCH_LOG_STREAM}`);
+      } else {
+        // If it exists, we might need to get the sequence token
+        const stream = streamsResponse.logStreams?.find(
+          stream => stream.logStreamName === CLOUDWATCH_LOG_STREAM
+        );
+        logSequenceToken = stream?.uploadSequenceToken;
+      }
+    } catch (error: any) {
+      console.error(`Error checking/creating log stream: ${error.message}`);
+      throw error; // Re-throw as this is critical
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Failed to initialize CloudWatch logs:', error);
+    return false;
+  }
+}
+
 // Helper function to send logs to CloudWatch
 async function sendToCloudWatch(level: string, message: string, args: any[]) {
   if (!cloudWatchLogsClient) return;
@@ -59,9 +127,27 @@ async function sendToCloudWatch(level: string, message: string, args: any[]) {
       sequenceToken: logSequenceToken
     };
     
-    const command = new PutLogEventsCommand(params);
-    const response = await cloudWatchLogsClient.send(command);
-    logSequenceToken = response.nextSequenceToken;
+    try {
+      const command = new PutLogEventsCommand(params);
+      const response = await cloudWatchLogsClient.send(command);
+      logSequenceToken = response.nextSequenceToken;
+    } catch (error: any) {
+      // If we get a ResourceNotFoundException, try to initialize and retry once
+      if (error.name === 'ResourceNotFoundException') {
+        const initialized = await initializeCloudWatchLogs();
+        if (initialized) {
+          // Retry the put operation now that we've created the stream
+          const retryCommand = new PutLogEventsCommand({
+            ...params,
+            sequenceToken: logSequenceToken // May have been updated by initializeCloudWatchLogs
+          });
+          const response = await cloudWatchLogsClient.send(retryCommand);
+          logSequenceToken = response.nextSequenceToken;
+        }
+      } else {
+        throw error; // Re-throw other errors
+      }
+    }
   } catch (error) {
     // If there's an error with CloudWatch, log to console but don't throw
     // This prevents logging issues from breaking the main functionality
@@ -161,6 +247,11 @@ async function createDailyRoom(): Promise<{ roomUrl: string; token: string }> {
 /**
  * Configuration type for RunPod instances
  */
+type DatacenterConfig = {
+  id: string;
+  networkVolumeId: string;
+};
+
 type RunPodConfig = {
   gpuTypeId: string;
   minVcpuCount: number;
@@ -171,6 +262,18 @@ type RunPodConfig = {
  * Launches a RunPod instance with the Sphinx bot
  */
 async function launchRunPodInstance(roomUrl: string, token: string, ttsConfig?: any): Promise<string> {
+  // Array of datacenters with their associated network volumes
+  const datacenterConfigs: DatacenterConfig[] = [
+    { id: "US-CA-2", networkVolumeId: "2asfjjhdxl" },
+    { id: "US-WA-1", networkVolumeId: "z3guhr3kq7"},
+    { id: "US-TX-3", networkVolumeId: "753enpqqhg"},
+    { id: "US-IL-1", networkVolumeId: "pwsi7066z6" },
+    { id: "US-GA-2", networkVolumeId: "oezj4md6us" },
+    { id: "CA-MTL-1", networkVolumeId: "220xq1cw3q"},
+    { id: "CA-MTL-3", networkVolumeId: "2kqbh7542h"},
+    // Add more datacenters as they become available
+  ];
+  
   // Array of configurations in order of preference
   const podConfigs: RunPodConfig[] = [
     {
@@ -188,6 +291,26 @@ async function launchRunPodInstance(roomUrl: string, token: string, ttsConfig?: 
       minVcpuCount: 4,
       minMemoryInGb: 15
     },   
+    {
+      gpuTypeId: "NVIDIA RTX 6000 Ada Generation",
+      minVcpuCount: 4,
+      minMemoryInGb: 15
+    },
+    {
+      gpuTypeId: "NVIDIA RTX A4500",
+      minVcpuCount: 4,
+      minMemoryInGb: 15
+    },
+    {
+      gpuTypeId : "NVIDIA RTX A5000",
+      minVcpuCount: 4,
+      minMemoryInGb: 15
+    },
+    {
+      gpuTypeId : "NVIDIA A40",
+      minVcpuCount: 4,
+      minMemoryInGb: 15
+    },
     {
       gpuTypeId: "NVIDIA GeForce RTX 4090",
       minVcpuCount: 4,
@@ -226,155 +349,166 @@ async function launchRunPodInstance(roomUrl: string, token: string, ttsConfig?: 
   ];
   
   // Try to launch with the first configuration in the array
-  return await attemptRunPodLaunch(roomUrl, token, ttsConfig, podConfigs);
+  return await attemptRunPodLaunch(roomUrl, token, ttsConfig, podConfigs, datacenterConfigs);
 }
 
 /**
  * Helper function that handles the RunPod launch with failover to alternative configurations
  */
-async function attemptRunPodLaunch(roomUrl: string, token: string, ttsConfig: any, podConfigs: RunPodConfig[]): Promise<string> {
-  try {
-    if (podConfigs.length === 0) {
-      throw new Error('No configurations available to try');
-    }
-    
-    // Get API keys from environment variables
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-    const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
-    const HUME_API_KEY = process.env.HUME_API_KEY || '';
-    const CARTESIA_API_KEY = process.env.CARTESIA_API_KEY || '';
-    
-    // Get AWS CloudWatch configuration
-    const MY_AWS_ACCESS_KEY_ID = process.env.MY_AWS_ACCESS_KEY_ID || '';
-    const MY_AWS_SECRET_ACCESS_KEY = process.env.MY_AWS_SECRET_ACCESS_KEY || '';
-    const MY_AWS_REGION = process.env.MY_AWS_REGION || 'us-east-1';
-    const CLOUDWATCH_LOG_GROUP = process.env.CLOUDWATCH_LOG_GROUP || '/sphinx-voice-bot';
-    
-    // Get Whisper device configuration
-    const SPHINX_WHISPER_DEVICE = process.env.SPHINX_WHISPER_DEVICE || 'cuda';
-    
-    // Unique identifier for this instance
-    const IDENTIFIER = `pod-${uuidv4()}`;
-    
-    // Format and prepare TTS config from client request or use default
-    const formattedTtsConfig = JSON.stringify({
-      "tts": ttsConfig || {
-        provider: 'cartesia',
-        voiceId: process.env.DEFAULT_VOICE_ID || 'ec58877e-44ae-4581-9078-a04225d42bd4',
-        model: process.env.DEFAULT_TTS_MODEL || 'sonic-turbo-2025-03-07',
-        speed: process.env.DEFAULT_TTS_SPEED || 1.0,
-        emotion: null
-      }
-    });
-    
-    const currentConfig = podConfigs[0];
-    await logger.log(`Attempting to launch with configuration: GPU=${currentConfig.gpuTypeId}, vCPUs=${currentConfig.minVcpuCount}, Memory=${currentConfig.minMemoryInGb}GB`);
-    await logger.log('Using TTS config:', formattedTtsConfig);
-    
-    // Base64 encode the config as expected by sphinx_bot.py
-    const base64TtsConfig = Buffer.from(formattedTtsConfig).toString('base64');
-    
-    await logger.log('Template ID:', SPHINX_TEMPLATE_ID);
-    
-    // Escape all values to safely include them in the query string
-    const escapeValue = (value: string) => value.replace(/"/g, '\\"');
-    
-    // Following RunPod's documentation example with direct string query
-    const query = `mutation {
-      podFindAndDeployOnDemand(
-        input: {
-          cloudType: COMMUNITY,
-          templateId: "${SPHINX_TEMPLATE_ID}",
-          gpuCount: 1,
-          volumeInGb: 0,
-          containerDiskInGb: 40,
-          minVcpuCount: ${currentConfig.minVcpuCount},
-          minMemoryInGb: ${currentConfig.minMemoryInGb},
-          gpuTypeId: "${currentConfig.gpuTypeId}",
-          name: "sphinx-bot-${IDENTIFIER}",
-          env: [
-            { key: "DAILY_ROOM_URL", value: "${escapeValue(roomUrl)}" },
-            { key: "DAILY_TOKEN", value: "${escapeValue(token)}" },
-            { key: "IDENTIFIER", value: "${IDENTIFIER}" },
-            { key: "OPENAI_API_KEY", value: "${escapeValue(OPENAI_API_KEY)}" },
-            { key: "ELEVENLABS_API_KEY", value: "${escapeValue(ELEVENLABS_API_KEY)}" },
-            { key: "HUME_API_KEY", value: "${escapeValue(HUME_API_KEY)}" },
-            { key: "CARTESIA_API_KEY", value: "${escapeValue(CARTESIA_API_KEY)}" },
-            { key: "TTS_CONFIG", value: "${escapeValue(base64TtsConfig)}" },
-            { key: "AWS_ACCESS_KEY_ID", value: "${escapeValue(MY_AWS_ACCESS_KEY_ID)}" },
-            { key: "AWS_SECRET_ACCESS_KEY", value: "${escapeValue(MY_AWS_SECRET_ACCESS_KEY)}" },
-            { key: "AWS_REGION", value: "${escapeValue(MY_AWS_REGION)}" },
-            { key: "CLOUDWATCH_LOG_GROUP", value: "${escapeValue(CLOUDWATCH_LOG_GROUP)}" },
-            { key: "SPHINX_WHISPER_DEVICE", value: "${escapeValue(SPHINX_WHISPER_DEVICE)}" }
-          ]
-        }
-      ) {
-        id
-      }
-    }`;
-    
-    // Send the GraphQL request to RunPod using the URL parameter for API key as shown in documentation
-    const runpodApiUrlWithKey = `${RUNPOD_API_URL}?api_key=${RUNPOD_API_KEY}`;
-    
-    // Using the exact same structure as the RunPod curl example
-    const response = await axios.post(
-      runpodApiUrlWithKey,
-      { query },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-    
-    await logger.log('RunPod response:', JSON.stringify(response.data, null, 2));
-
-    // Check if we received a specific error about no instances available
-    if (response.data.errors && 
-        response.data.errors.length > 0 && 
-        response.data.errors[0].message && 
-        response.data.errors[0].message.includes("no longer any instances available")) {
-      
-      // If we have more configurations to try
-      if (podConfigs.length > 1) {
-        // Remove the failed configuration from the array
-        const failedConfig = podConfigs.shift();
-        const nextConfig = podConfigs[0];
-        await logger.log(`No instances available for GPU type: ${failedConfig?.gpuTypeId}. Trying next option: ${nextConfig.gpuTypeId} with ${nextConfig.minVcpuCount} vCPUs and ${nextConfig.minMemoryInGb}GB memory`);
-        
-        // Recursively call this function with the modified configurations array
-        return await attemptRunPodLaunch(roomUrl, token, ttsConfig, podConfigs);
-      } else {
-        throw new Error('No instances available for any of the configured options');
-      }
-    }
-
-    // Extract pod ID from response
-    const podId = response.data.data.podFindAndDeployOnDemand.id;
-    await logger.log(`RunPod instance launched successfully with configuration: GPU=${currentConfig.gpuTypeId}, vCPUs=${currentConfig.minVcpuCount}, Memory=${currentConfig.minMemoryInGb}GB`, podId);
-    return podId;
-  } catch (error) {
-    await logger.error('Error launching RunPod instance:', error);
-    // Special case for exhausting all configurations
-    if (error instanceof Error && error.message === 'No instances available for any of the configured options') {
-      throw error;
-    }
-    
-    // For any other error, try the next configuration if available
-    if (podConfigs.length > 1) {
-      const failedConfig = podConfigs.shift();
-      const nextConfig = podConfigs[0];
-      await logger.log(`Failed with configuration: GPU=${failedConfig?.gpuTypeId}, vCPUs=${failedConfig?.minVcpuCount}, Memory=${failedConfig?.minMemoryInGb}GB. Trying next option: GPU=${nextConfig.gpuTypeId}, vCPUs=${nextConfig.minVcpuCount}, Memory=${nextConfig.minMemoryInGb}GB`);
-      
-      // Add a small delay before retrying to prevent rate limiting
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Recursively call this function with the modified configurations array
-      return await attemptRunPodLaunch(roomUrl, token, ttsConfig, podConfigs);
-    } else {
-      throw new Error('Failed to launch RunPod instance with any of the configured options');
-    }
+async function attemptRunPodLaunch(
+  roomUrl: string,
+  token: string,
+  ttsConfig: any,
+  podConfigs: RunPodConfig[],
+  datacenterConfigs: DatacenterConfig[]
+): Promise<string> {
+  if (podConfigs.length === 0) {
+    throw new Error('No configurations available to try');
   }
+
+  // Get API keys from environment variables
+  const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+  const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
+  const HUME_API_KEY = process.env.HUME_API_KEY || '';
+  const CARTESIA_API_KEY = process.env.CARTESIA_API_KEY || '';
+  
+  // Get AWS CloudWatch configuration
+  const MY_AWS_ACCESS_KEY_ID = process.env.MY_AWS_ACCESS_KEY_ID || '';
+  const MY_AWS_SECRET_ACCESS_KEY = process.env.MY_AWS_SECRET_ACCESS_KEY || '';
+  const MY_AWS_REGION = process.env.MY_AWS_REGION || 'us-east-1';
+  const CLOUDWATCH_LOG_GROUP = process.env.CLOUDWATCH_LOG_GROUP || '/sphinx-voice-bot';
+  
+  // Get Whisper device configuration
+  const SPHINX_WHISPER_DEVICE = process.env.SPHINX_WHISPER_DEVICE || 'cuda';
+  
+  // Unique identifier for this instance
+  const IDENTIFIER = `pod-${uuidv4()}`;
+  
+  // Define formattedTtsConfig once, outside the loops
+  const formattedTtsConfig = JSON.stringify({
+    "tts": ttsConfig || {
+      provider: 'cartesia',
+      voiceId: process.env.DEFAULT_VOICE_ID || 'ec58877e-44ae-4581-9078-a04225d42bd4',
+      model: process.env.DEFAULT_TTS_MODEL || 'sonic-turbo-2025-03-07',
+      speed: process.env.DEFAULT_TTS_SPEED || 1.0,
+      emotion: null
+    }
+  });
+  const base64TtsConfig = Buffer.from(formattedTtsConfig).toString('base64');
+
+  // Collect errors for a detailed final message
+  const errors: string[] = [];
+
+  // Try each pod configuration
+  for (let index = 0; index < podConfigs.length; index++) {
+    const currentConfig = podConfigs[index];
+    await logger.log(`Trying pod configuration ${index}: ${JSON.stringify(currentConfig)}`);
+    
+    // For each pod configuration, try all datacenters
+    for (const datacenterConfig of datacenterConfigs) {
+      try {
+        await logger.log(`Attempting to launch pod with config: ${JSON.stringify(currentConfig)} in datacenter: ${datacenterConfig.id}`);
+        
+        await logger.log('Template ID:', SPHINX_TEMPLATE_ID);
+        
+        // Escape all values to safely include them in the query string
+        const escapeValue = (value: string) => value.replace(/"/g, '\"');
+        
+        const query = `mutation {
+          podFindAndDeployOnDemand(
+            input: {
+              cloudType: SECURE,
+              templateId: "${SPHINX_TEMPLATE_ID}",
+              gpuCount: 1,
+              volumeInGb: 0,
+              containerDiskInGb: 40,
+              minVcpuCount: ${currentConfig.minVcpuCount},
+              minMemoryInGb: ${currentConfig.minMemoryInGb},
+              gpuTypeId: "${currentConfig.gpuTypeId}",
+              dataCenterId: "${datacenterConfig.id}",
+              networkVolumeId: "${datacenterConfig.networkVolumeId}",
+              name: "sphinx-bot-${IDENTIFIER}",
+              env: [
+                { key: "DAILY_ROOM_URL", value: "${escapeValue(roomUrl)}" },
+                { key: "DAILY_TOKEN", value: "${escapeValue(token)}" },
+                { key: "IDENTIFIER", value: "${IDENTIFIER}" },
+                { key: "OPENAI_API_KEY", value: "${escapeValue(OPENAI_API_KEY)}" },
+                { key: "ELEVENLABS_API_KEY", value: "${escapeValue(ELEVENLABS_API_KEY)}" },
+                { key: "HUME_API_KEY", value: "${escapeValue(HUME_API_KEY)}" },
+                { key: "CARTESIA_API_KEY", value: "${escapeValue(CARTESIA_API_KEY)}" },
+                { key: "TTS_CONFIG", value: "${escapeValue(base64TtsConfig)}" },
+                { key: "AWS_ACCESS_KEY_ID", value: "${escapeValue(MY_AWS_ACCESS_KEY_ID)}" },
+                { key: "AWS_SECRET_ACCESS_KEY", value: "${escapeValue(MY_AWS_SECRET_ACCESS_KEY)}" },
+                { key: "AWS_REGION", value: "${escapeValue(MY_AWS_REGION)}" },
+                { key: "CLOUDWATCH_LOG_GROUP", value: "${escapeValue(CLOUDWATCH_LOG_GROUP)}" },
+                { key: "SPHINX_WHISPER_DEVICE", value: "${escapeValue(SPHINX_WHISPER_DEVICE)}" },
+                { key: "SPHINX_MOUNT_POINT", value: "/workspace" },
+                { key: "SPHINX_REPO_ID", value: "Systran/faster-whisper-medium" },
+              ]
+            }
+          ) {
+            id
+          }
+        }`;
+        
+        const runpodApiUrlWithKey = `${RUNPOD_API_URL}?api_key=${RUNPOD_API_KEY}`;
+        
+        const response = await axios.post(
+          runpodApiUrlWithKey,
+          { query },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        
+        await logger.log('RunPod response:', JSON.stringify(response.data, null, 2));
+
+        // Handle specific "no instances" error
+        if (response.data.errors && 
+            response.data.errors.length > 0 && 
+            response.data.errors[0].message && 
+            response.data.errors[0].message.includes("no longer any instances available")) {
+          const errorMsg = `No instances available in datacenter ${datacenterConfig.id} for GPU type: ${currentConfig.gpuTypeId}`;
+          await logger.error(errorMsg);
+          errors.push(errorMsg);
+          continue;
+        }
+
+        // Handle other API errors
+        if (response.data.errors) {
+          const errorMessage = response.data.errors[0]?.message || 'Unknown error';
+          const errorMsg = `Error deploying pod with config ${index} in datacenter ${datacenterConfig.id}: ${errorMessage}`;
+          await logger.error(errorMsg);
+          errors.push(errorMsg);
+          continue;
+        }
+
+        // Successfully deployed pod
+        const podId = response.data.data?.podFindAndDeployOnDemand?.id;
+        if (podId) {
+          await logger.log(`Successfully deployed pod with ID: ${podId} in datacenter ${datacenterConfig.id}`);
+          return podId;
+        } else {
+          const errorMsg = `Pod ID not found in response for config ${index} in datacenter ${datacenterConfig.id}`;
+          await logger.error(errorMsg);
+          errors.push(errorMsg);
+          continue;
+        }
+      } catch (error: any) {
+        const errorMsg = `Failed to deploy with config ${index} in datacenter ${datacenterConfig.id}: ${error.message}`;
+        await logger.error(errorMsg);
+        errors.push(errorMsg);
+        continue;
+      }
+    }
+    
+    await logger.log(`All datacenters failed for configuration ${index}, trying next configuration`);
+  }
+
+  // If all attempts failed, throw a detailed error
+  throw new Error(`No instances available for any configured options. Errors encountered: ${errors.join('; ')}`);
 }
 
 /**

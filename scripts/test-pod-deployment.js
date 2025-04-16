@@ -1,6 +1,6 @@
 // Test pod deployment with basic configuration
 const fetch = require('node-fetch');
-require('dotenv').config({ path: './frontend-next/.env.local' });
+require('dotenv').config({ path: '../frontend-next/.env.local' });
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY;
 const RUNPOD_API_URL = 'https://api.runpod.io/graphql';
@@ -16,12 +16,14 @@ async function testPodDeployment() {
       mutation {
         podFindAndDeployOnDemand(input: {
           cloudType: COMMUNITY
-          templateId: "nkugydodfq"
+          templateId: "4njxjs5ikx"
           gpuCount: 1
           gpuTypeId: "NVIDIA GeForce RTX 4090"
           name: "my-pod"
           volumeInGb: 0
-          containerDiskInGb: 40
+          containerDiskInGb: 20
+          dataCenterId: "US-IL-1"
+          networkVolumeId: "pwsi7066z6"
           env: []
         }) {
           id

@@ -8,8 +8,7 @@ import argparse
 import asyncio
 import os
 import sys
-import argparse
-import time
+from huggingface_hub import snapshot_download
 
 # Import our custom CloudWatch logger
 from cloudwatch_logger import setup_cloudwatch_logging
@@ -26,7 +25,7 @@ from pipecat.services.cartesia.tts import CartesiaTTSService, Language
 from pipecat.services.elevenlabs import ElevenLabsTTSService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyTransport, DailyParams
-from pipecat.services.whisper import WhisperSTTService, Model
+from pipecat.services.whisper.stt import WhisperSTTService, Model
 from pipecat.processors.frameworks.rtvi import RTVIProcessor, RTVIConfig, RTVIObserver, RTVIMessage, RTVIAction, RTVIActionArgument
 from pipecat_flows import FlowManager
 from sphinx_script import sphinx_flow_config
@@ -76,7 +75,7 @@ class SessionTimeoutHandler:
 
             # Send the TTS message to inform the user about the timeout
             await self.tts.say(
-                "I'm sorry, we are ending the call now. Please feel free to reach out again if you need assistance."
+                "I'm sorry, we are ending the session now due to timeout."
             )
 
             # Start the process to gracefully end the call in the background
@@ -158,7 +157,7 @@ async def run_bot(room_url, token, identifier, data=None):
     logger.info(f"Starting Sphinx bot in room {room_url} with identifier {identifier}")
     
     # print all env variables
-    logger.info(f"All environment variables: {dict(os.environ)}")
+    #logger.info(f"All environment variables: {dict(os.environ)}")
     # Parse the data if provided
     logger.info(f"Received data: {data}")
     config_data = {}
@@ -193,7 +192,53 @@ async def run_bot(room_url, token, identifier, data=None):
     sphinx_whisper_device = os.getenv("SPHINX_WHISPER_DEVICE", "cuda")
     logger.info(f"Using device for Whisper STT (SPHINX_WHISPER_DEVICE): {sphinx_whisper_device}")
     
-    stt = WhisperSTTService(
+    # Check if mount point is provided and valid
+    mount_point = os.getenv("SPHINX_MOUNT_POINT", None)
+    repo_id = os.getenv("SPHINX_REPO_ID", None)
+    model_path = None
+    
+    if mount_point and repo_id:
+        # Format the full model path
+        model_path = os.path.join(mount_point, "models", "whisper-medium-ct2")
+        logger.info(f"Using mount point for Whisper model: {mount_point}")
+        logger.info(f"Hugging Face repo ID: {repo_id}")
+        logger.info(f"Full model path: {model_path}")
+        
+        # Check if model directory exists
+        if not os.path.exists(model_path):
+            #log the content of the network volume for debugging starting from the root of the volume
+            logger.info(f"Content of the network volume: {os.listdir(mount_point)}")
+            logger.info(f"Model not found at {model_path}, downloading from Hugging Face repo: {repo_id}")
+            try:
+                # Create the models directory if it doesn't exist
+                os.makedirs(os.path.dirname(model_path), exist_ok=True)
+                
+                # Download the model from Hugging Face
+                logger.info(f"Starting model download from Hugging Face...")
+                snapshot_download(
+                    repo_id=repo_id,
+                    local_dir=model_path,
+                    local_dir_use_symlinks=False
+                )
+                
+                logger.info(f"Successfully downloaded model to {model_path}")
+            except Exception as e:
+                logger.error(f"Error downloading model from Hugging Face: {e}")
+                model_path = None
+        else:
+            logger.info(f"Model found at {model_path}")
+    
+    # Initialize WhisperSTTService with model path if available
+    if model_path and os.path.exists(model_path):
+        logger.info(f"Using local model from {model_path}")
+        stt = WhisperSTTService(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            device=sphinx_whisper_device,
+            model=model_path  # Pass the model path directly to the model parameter
+        )
+    else:
+        logger.info("Using default Whisper model configuration")
+        stt = WhisperSTTService(
             api_key=os.getenv("OPENAI_API_KEY"),
             device=sphinx_whisper_device,
             model=Model.MEDIUM
@@ -379,5 +424,5 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-
+       
     asyncio.run(run_bot(args.url, args.token, args.identifier, args.data))

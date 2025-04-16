@@ -1,6 +1,6 @@
 // List all available RunPod templates for your account
 const fetch = require('node-fetch');
-require('dotenv').config({ path: './frontend-next/.env.local' });
+require('dotenv').config({ path: '../frontend-next/.env.local' });
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY;
 const RUNPOD_API_URL = 'https://api.runpod.io/graphql';
@@ -28,10 +28,23 @@ async function listTemplates() {
             minDisk:40
             minMemoryInGb:15
             minVcpuCount:4
-            secureCloud:false
-            allowedCudaVersions:["12.0","12.1","12.2","12.3"]
-            includeAiApi:false
+
           }) {
+            available
+            stockStatus
+            gpuTypeId
+            displayName
+          }
+        }
+      }
+    }`;
+
+    const query3 = `{
+      myself {
+        datacenters {
+          id
+          name
+          gpuAvailability{
             available
             stockStatus
             gpuTypeId
@@ -47,7 +60,7 @@ async function listTemplates() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${RUNPOD_API_KEY}`
       },
-      body: JSON.stringify({ query:query2 })
+      body: JSON.stringify({ query:query3 })
     });
     
     const data = await response.json();
@@ -57,7 +70,7 @@ async function listTemplates() {
       return;
     }
     
-    console.log(JSON.stringify(data.data, null, 2));
+    console.log("Result: " + JSON.stringify(data, null, 2));
     const templates = data.data.myself.podTemplates;
     
     console.log(`Found ${templates.length} templates in your account:\n`);

@@ -1,6 +1,6 @@
 // Simple script to query RunPod for available GPU types
 const axios = require('axios');
-require('dotenv').config({ path: './frontend-next/.env.local' });
+require('dotenv').config({ path: '../frontend-next/.env.local' });
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY;
 const RUNPOD_API_URL = 'https://api.runpod.io/graphql';
