@@ -45,8 +45,8 @@ async def consider_challenge_callback(
 async def select_challenge_handler(args : FlowArgs) -> FlowResult:
     challenge = args.get("challenge", "").lower()
     logger.info(f"[Flow]select_challenge_handler: {challenge}")
-    #Validate challenge
-    if challenge not in ["fearful", "anxious", "stagnant", "ruminating", "disassociated", "numb", "unhealthy", "scarcity", "excluded", "lack of control", "disembodied", "ungrounded", "obsessed", "silenced", "unheard", "lack of purpose", "unmotivated", "shameful"]:
+    #Validate challenge by checking if challenge contains one of the following words
+    if not any(word in challenge for word in ["fearful", "anxious", "stagnant", "ruminating", "disassociated", "numb", "unhealthy", "scarcity", "excluded", "lack of control", "disembodied", "ungrounded", "obsessed", "silenced", "unheard", "lack of purpose", "unmotivated", "shameful"]):
         return {"status": "error", "message": "Invalid challenge"}
     return {"status": "success", "challenge": challenge}
 
@@ -76,9 +76,49 @@ async def confirm_challenge_callback(
 ):
     logger.info(f"[Flow]confirm_challenge_callback {result}")
     if result["user_confirming"]:
-        await flow_manager.set_node("goodbye", sphinx_flow_config["nodes"]["goodbye"])
+        await flow_manager.set_node("record_challenge_in_depth", sphinx_flow_config["nodes"]["challenge_in_depth"])
     else:
         await flow_manager.set_node("select_challenge", sphinx_flow_config["nodes"]["select_challenge"])
+
+async def record_challenge_in_depth_handler(args : FlowArgs) -> FlowResult:
+    user_challenge_in_depth = args.get("user_challenge_in_depth", "").lower()
+    logger.info(f"[Flow]record_challenge_in_depth_handler {user_challenge_in_depth}")
+    return {"status": "success", "user_challenge_in_depth": user_challenge_in_depth}
+
+async def record_challenge_in_depth_callback(
+    args: FlowArgs,
+    result: FlowResult,
+    flow_manager: FlowManager
+):
+    logger.info(f"[Flow]record_challenge_in_depth_callback {result}")
+    if result["user_challenge_in_depth"]:
+        # Wait until emotions have been processed
+        logger.info("Waiting for emotions to be processed")
+        #wait up to 60 seconds
+        for _ in range(120):
+            await asyncio.sleep(0.5)
+            if flow_manager.state.get("emotions_fully_processed", False):
+                break
+        logger.info("Emotions processed, moving to confirm_emotions")
+        await flow_manager.set_node("confirm_emotions", sphinx_flow_config["nodes"]["confirm_emotions"])
+    else:
+        await flow_manager.set_node("challenge_in_depth", sphinx_flow_config["nodes"]["challenge_in_depth"])
+
+# New handlers for confirming emotions
+async def confirm_emotions_handler(args: FlowArgs) -> FlowResult:
+    user_input = args.get("user_input", "").lower()
+    is_confirmed = any(word in user_input for word in ["yes", "true", "correct", "absolutely", "yeah"])
+    return {"status": "success", "emotions_confirmed": is_confirmed}
+
+async def confirm_emotions_callback(
+    args: FlowArgs,
+    result: FlowResult,
+    flow_manager: FlowManager
+):
+    if result.get("emotions_confirmed"):
+        await flow_manager.set_node("goodbye", sphinx_flow_config["nodes"]["goodbye"])
+    else:
+        await flow_manager.set_node("challenge_in_depth", sphinx_flow_config["nodes"]["challenge_in_depth"])
 
 sphinx_flow_config = FlowConfig(
     initial_node="greeting",
@@ -93,10 +133,11 @@ sphinx_flow_config = FlowConfig(
             "functions": [
                 FlowsFunctionSchema(
                     name="check_for_ready",
-                    description="Wait for the user to be ready to proceed",
+                    description="Wait for the user to be ready to proceed. When he is ready proceed to collecting his name.",
                     properties={"user_input": {"type": "string", "description": "The user's input"}},
                     required=["user_input"],
                     handler=ready_handler,
+                    #transition_to="collect_name"
                     transition_callback=greeting_callback
                 )
             ],
@@ -113,7 +154,7 @@ sphinx_flow_config = FlowConfig(
             "functions": [
                 FlowsFunctionSchema(
                     name="collect_name",
-                    description="Record the user's name",
+                    description="Record the user's name.",
                     properties={"name": {"type": "string", "description": "The user's name"}},
                     required=["name"],
                     handler=collect_name_handler,
@@ -183,6 +224,46 @@ sphinx_flow_config = FlowConfig(
                 "options": ["Yes", "No"]
             }
         },
+        "challenge_in_depth" : {
+            "task_messages": [
+                {"role": "system", "content": "Explore the user's challenge in depth. Example : 'I see you're feeling fearful. What is it like to be going through it?'. After recording the user input giving them ample time to respond, confirm with them if they are done."}
+            ],
+            "functions": [
+                FlowsFunctionSchema(
+                    name="record_challenge_in_depth",
+                    description="Record the user's challenge in depth. Once recorded, confirm with them if they are done, and move to the next step.",
+                    properties={"user_challenge_in_depth": {"type": "string", "description": "The user's own description of their challenge in depth"}},
+                    required=["user_challenge_in_depth"],
+                    handler=record_challenge_in_depth_handler,
+                    transition_callback=record_challenge_in_depth_callback
+                )
+            ],
+            "ui_override": {
+                "type": "button",
+                "prompt": "Is participant done?",
+                "action_text": "I am done"
+            }
+        },
+        "confirm_emotions": {
+            "task_messages": [
+                {"role": "system", "content": "Emotions Detected: {emotion_summary}. Confirm with the user the emotions detected while he was speaking about the challenge in depth. For example: 'It sounds like you’re feeling {emotion_summary} from experiencing {challenge}. Is that true?'".format(**state)}
+            ],
+            "functions": [
+                FlowsFunctionSchema(
+                    name="confirm_emotions",
+                    description="Record the user's confirmation of detected emotions",
+                    properties={"user_input": {"type": "string", "description": "User response confirming the emotions"}},
+                    required=["user_input"],
+                    handler=confirm_emotions_handler,
+                    transition_callback=confirm_emotions_callback
+                )
+            ],
+            "ui_override": {
+                "type": "list",
+                "prompt": "Are these emotions accurate?",
+                "options": ["Yes", "No"]
+            }
+        },
         "goodbye": {
             "task_messages": [
                 {"role": "system", "content": "Say goodbye using the user's name."}
@@ -191,4 +272,3 @@ sphinx_flow_config = FlowConfig(
         }
     }
 )
-

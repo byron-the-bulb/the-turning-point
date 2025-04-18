@@ -1,11 +1,19 @@
 from pipecat_flows.manager import FlowManager
 from status_utils import status_updater  # Assuming this is your status update utility
+from loguru import logger
 
 class CustomFlowManager(FlowManager):
     async def set_node(self, node_name, node_config):
         # Call the parent class's set_node to maintain default behavior
         await super().set_node(node_name, node_config)
         
+        logger.info(f"Node {node_name} state: {self.state}")
+        # Initialize emotion-related states if not present
+        if not hasattr(self, 'state'):
+            self.state = {}
+        self.state.setdefault('user_started_speaking', False)
+        self.state.setdefault('emotions_fully_processed', False)
+
         # Check if the node config includes a ui_override
         if "ui_override" in node_config:
             # Send the ui_override message via your status_updater

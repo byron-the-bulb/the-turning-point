@@ -10,6 +10,7 @@ import ChatLog, { ChatMessage, MessageType } from '@/components/ChatLog';
 import VoiceSelector from '@/components/VoiceSelector';
 import VoiceSettingsPanel from '@/components/VoiceSettingsPanel';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import EmotionTracker, { EmotionData } from '@/components/EmotionTracker';
 
 // Import types
 import { TTSConfig } from '@/types';
@@ -74,6 +75,7 @@ export default function Home() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isWaitingForParticipant, setIsWaitingForParticipant] = useState(false);
+  const [emotionData, setEmotionData] = useState<EmotionData | null>(null);
   const eventHandlersAttached = useRef(false);
   const initialMessageSent = useRef(false);
 
@@ -200,7 +202,7 @@ export default function Home() {
     const handleServerMessage = (event: any) => {
       console.log('Server message received:', event);
       if (event) {
-        // It's either status or trigger
+        // It's either status or trigger or emotion
         if (event.status) {
           addChatMessage(event.status, 'system');
           setConversationStatus(event.status_context?.node || null);
@@ -217,6 +219,15 @@ export default function Home() {
             logSetPendingUIOverride(null);
             setIsWaitingForUser(true);
           }
+        } else if (event.emotion) {
+          console.log('Emotion received:', event.emotion);
+          if (event.emotion.prosody && event.emotion.prosody.predictions && event.emotion.prosody.predictions.length > 0) {
+            console.log('Prosody emotion data received:', event.emotion);
+            // Update the emotion data state with the prosody predictions
+            setEmotionData({
+              predictions: event.emotion.prosody.predictions
+            });
+          }
         }
       }
     };
@@ -231,6 +242,11 @@ export default function Home() {
 
     const handleBotStoppedSpeaking = () => {
       console.log('Bot stopped speaking');
+      if (pendingUIOverrideRef.current) {
+        console.log('Setting UI override:', pendingUIOverrideRef.current);
+        setUIOverride(pendingUIOverrideRef.current);
+        logSetPendingUIOverride(null);
+      }
       setIsWaitingForUser(true);
     };
 
@@ -418,7 +434,7 @@ export default function Home() {
             Stop Experience
           </button>
         </div>
-        
+
         {clientInstance ? (
           <RTVIClientProvider client={clientInstance}>
             <RTVIClientAudio />
@@ -436,6 +452,11 @@ export default function Home() {
             isUserSpeaking={isUserSpeaking}
             uiOverride={uiOverride}
           />
+        )}
+        
+        {/* Emotion Tracker Component */}
+        {isConnected && (
+          <EmotionTracker emotionData={emotionData} />
         )}
         
         {(isConnecting || isWaitingForParticipant) && (

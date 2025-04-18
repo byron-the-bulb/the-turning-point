@@ -16,8 +16,9 @@ from cloudwatch_logger import setup_cloudwatch_logging
 from dotenv import load_dotenv
 from loguru import logger
 
-from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.silero import SileroVADAnalyzer, VADParams
 from pipecat.pipeline.pipeline import Pipeline
+from pipecat.pipeline.parallel_pipeline import ParallelPipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
@@ -28,7 +29,7 @@ from pipecat.transports.services.daily import DailyTransport, DailyParams
 from pipecat.services.whisper.stt import WhisperSTTService, Model
 from pipecat.processors.frameworks.rtvi import RTVIProcessor, RTVIConfig, RTVIObserver, RTVIMessage, RTVIAction, RTVIActionArgument
 from pipecat_flows import FlowManager
-from sphinx_script import sphinx_flow_config
+from sphinx_script_dynamic import create_initial_node
 from status_utils import status_updater
 from custom_flow_manager import CustomFlowManager
 from pipecat.processors.frame_processor import FrameDirection
@@ -38,6 +39,8 @@ from pipecat.utils.time import time_now_iso8601
 import json
 import base64
 from pipecat.transports.services.helpers.daily_rest import DailyRESTHelper, DailyRoomParams
+from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
+from hume_offline_processor import HumeOfflineWebSocketProcessor
 
 
 load_dotenv(override=True)
@@ -105,28 +108,35 @@ class CustomRTVIProcessor(RTVIProcessor):
         self.flow_manager = None  # Access node config (task messages)
         self.speech_count = 0            # Track TextFrames sent to TTS
         self.is_final = False
+        self.hume_processor = None
 
     def set_flow_manager(self, flow_manager):
         self.flow_manager = flow_manager
+
+    def set_hume_offline_processor(self, hume_processor):
+        self.hume_processor = hume_processor
+        self.hume_processor.set_rtvi(self)
 
     async def process_frame(self, frame, direction):
         # Handle outbound frames (server-to-client)
         #logger.info(f"Processing frame: {frame} direction: {direction}")
 
-        if direction == FrameDirection.UPSTREAM:
-            if isinstance(frame, BotStoppedSpeakingFrame) and self.flow_manager:
-                # Check if this is the final speech segment
-                logger.info(f"BotStoppedSpeakingFrame received: {self.speech_count}")
-                # Get current node configuration properly
-                if self.flow_manager.current_node and self.flow_manager.current_node in self.flow_manager.nodes:
-                    self.speech_count += 1
-                    current_node_config = self.flow_manager.nodes[self.flow_manager.current_node]
-                    total_messages = len(current_node_config.get("task_messages", []))
-                    if self.speech_count == total_messages:
-                        logger.info(f"Final speech segment received: {self.speech_count}")
-                        await status_updater.trigger_ui_override()                  # Send a message to the client to display ui_override
-                        self.speech_count = 0
-                        self.is_final = False
+        #if direction == FrameDirection.UPSTREAM:
+        #    if isinstance(frame, BotStoppedSpeakingFrame) and self.flow_manager:
+        #        # Check if this is the final speech segment
+        #        logger.info(f"BotStoppedSpeakingFrame received: {self.speech_count}")
+        #        # Get current node configuration properly
+        #        logger.info(f"Current node: {self.flow_manager.current_node}")
+        #        logger.info(f"Nodes: {self.flow_manager.nodes}")
+        #        if self.flow_manager.current_node and self.flow_manager.current_node in self.flow_manager.nodes:
+        #            self.speech_count += 1
+        #            current_node_config = self.flow_manager.nodes[self.flow_manager.current_node]
+        #            total_messages = len(current_node_config.get("task_messages", []))
+        #            if self.speech_count == total_messages:
+        #                logger.info(f"Final speech segment received: {self.speech_count}")
+        #                await status_updater.trigger_ui_override()                  # Send a message to the client to display ui_override
+        #                self.speech_count = 0
+        #                self.is_final = False
 
         # Existing logic for inbound frames (client-to-server)
         #if direction == FrameDirection.DOWNSTREAM and hasattr(frame, 'label') and frame.label == "rtvi-ai":
@@ -139,6 +149,8 @@ class CustomRTVIProcessor(RTVIProcessor):
         #       if selection:
         #            await self.queue_frame(TextFrame(selection))
 
+        if self.hume_processor:
+            await self.hume_processor.process_frame(frame, direction)
         # Pass the frame to the parent class for default processing
         return await super().process_frame(frame, direction)
 
@@ -177,16 +189,16 @@ async def run_bot(room_url, token, identifier, data=None):
         token=token,
         bot_name="Sphinx",
         params=DailyParams(
+            #audio_in_enabled=True,
             audio_out_enabled=True,
-            add_wav_header=True,
             vad_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(),
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=1.8)),
             vad_audio_passthrough=True,
             session_timeout=60 * 2,
         ),
     )
     
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
+    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4.5-preview")
     
     # Get device from environment variable, default to cuda
     sphinx_whisper_device = os.getenv("SPHINX_WHISPER_DEVICE", "cuda")
@@ -278,12 +290,15 @@ async def run_bot(room_url, token, identifier, data=None):
 
     context = OpenAILLMContext(messages)
     context_aggregator = llm.create_context_aggregator(context)
-    
+
     rtvi = CustomRTVIProcessor(config=RTVIConfig(config=[]))
     await status_updater.initialize(rtvi, identifier, room_url)
-    pipeline = Pipeline(
+    hume_processor = HumeOfflineWebSocketProcessor(api_key=os.getenv("HUME_API_KEY"))
+    rtvi.set_hume_offline_processor(hume_processor)
+    conversation_pipeline = Pipeline(
         [
             transport.input(),  # Websocket input from client
+            #hume_processor,
             rtvi,
             stt,  # Speech-To-Text
             context_aggregator.user(),
@@ -291,15 +306,16 @@ async def run_bot(room_url, token, identifier, data=None):
             tts,  # Text-To-Speech
             transport.output(),  # Websocket output to client
             context_aggregator.assistant(),
+
         ]
     )
 
     task = PipelineTask(
-        pipeline,
+        conversation_pipeline,
         params=PipelineParams(
             audio_in_sample_rate=16000,
-            audio_out_sample_rate=16000,
-            allow_interruptions=True,
+            audio_out_sample_rate=48000,
+            allow_interruptions=False,
         ),
         observers=[RTVIObserver(rtvi)]
     )
@@ -308,8 +324,7 @@ async def run_bot(room_url, token, identifier, data=None):
         task=task,
         llm=llm,
         context_aggregator=context_aggregator, 
-        tts=tts,
-        flow_config=sphinx_flow_config
+        tts=tts
     )
 
     rtvi.set_flow_manager(flow_manager)
@@ -333,8 +348,15 @@ async def run_bot(room_url, token, identifier, data=None):
 
     rtvi.register_action(uioverride_response_action)
 
+    
+    #@audiobuffer.event_handler("on_audio_data")
+    #async def on_audio_data(buffer, audio, sample_rate, num_channels):
+    #    logger.info(f"Audio data received: {len(audio)} bytes")
+    #    await hume_client.send_audio_buffer(audio, sample_rate, num_channels)
+
     @transport.event_handler("on_participant_joined")
     async def on_participant_joined(transport, participant):
+        #await audiobuffer.start_recording()
         # Kick off the conversation.
         participant_id = participant['id']
         logger.info(f"New client connected: {participant_id} using identifier {identifier}")
@@ -349,6 +371,9 @@ async def run_bot(room_url, token, identifier, data=None):
             
             # Initialize the flow manager
             await flow_manager.initialize()
+
+            # Start the flow manager
+            await flow_manager.set_node("greeting", create_initial_node())
         except Exception as e:
             logger.error(f"Error during client connection handling: {e}")
 
