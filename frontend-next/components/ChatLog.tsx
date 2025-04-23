@@ -3,9 +3,10 @@ import { useRTVIClient } from '@pipecat-ai/client-react';
 import { v4 as uuidv4 } from 'uuid';
 import styles from '@/styles/ChatLog.module.css';
 import { RTVIMessage } from '@pipecat-ai/client-js';
+import { EmotionData } from '@/components/EmotionTracker';
 
 // Message types
-export type MessageType = 'system' | 'user' | 'guide' | 'status';
+export type MessageType = 'system' | 'user' | 'guide' | 'status' | 'emotion';
 
 // Chat message interface
 export interface ChatMessage {
@@ -20,9 +21,10 @@ interface ChatLogProps {
   isWaitingForUser: boolean;
   isUserSpeaking: boolean;
   uiOverride: any | null;
+  emotionData: EmotionData | null;
 }
 
-const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpeaking, uiOverride }) => {
+const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpeaking, uiOverride, emotionData }) => {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const uiOverrideRef = useRef<HTMLDivElement>(null);
   const client = useRTVIClient();
@@ -105,6 +107,8 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpe
         )}
       </div>
       
+      {/* Emotion data is now displayed as chat messages */}
+      
       <div className={styles.chatMessages}>
         {messages.map((message) => (
           <div 
@@ -115,7 +119,8 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpe
               <span className={styles.messageType}>
                 {message.type === 'user' ? 'Participant' : 
                  message.type === 'guide' ? 'Sphinx' : 
-                 message.type === 'system' ? 'System' : 'Status'}
+                 message.type === 'system' ? 'System' :
+                 message.type === 'emotion' ? 'Emotion Detection' : 'Status'}
               </span>
               <span className={styles.messageTime}>
                 {message.timestamp.toLocaleTimeString()}

@@ -9,7 +9,7 @@ export interface Emotion {
 
 export interface EmotionPrediction {
   emotions: Emotion[];
-  time: {
+  time?: {
     begin: number;
     end: number;
   };
@@ -82,9 +82,9 @@ const EmotionTracker: React.FC<EmotionTrackerProps> = ({ emotionData }) => {
       });
     });
     
-    // Create time points for X-axis
-    const timePoints = emotionHistory.map((prediction, index) => 
-      prediction.time.begin.toFixed(1) + 's'
+    // Create points for X-axis based on incrementing indices instead of time
+    const timePoints = emotionHistory.map((_, index) => 
+      `#${index + 1}`
     );
     
     // Create emotion lines data

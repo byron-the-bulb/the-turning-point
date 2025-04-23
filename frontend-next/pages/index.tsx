@@ -67,7 +67,7 @@ export default function Home() {
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
   const [uiOverride, setUIOverride] = useState<any | null>(null);
   const [pendingUIOverride, setPendingUIOverride] = useState<any | null>(null);
-  const pendingUIOverrideRef = useRef<any | null>(null); 
+  const pendingUIOverrideRef = useRef<any | null>(null);
   const [selectedVoiceId, setSelectedVoiceId] = useState(defaultTtsConfig.voiceId);
   const [selectedSpeed, setSelectedSpeed] = useState(defaultTtsConfig.speed);
   const [selectedEmotions, setSelectedEmotions] = useState<string[] | null>(defaultTtsConfig.emotion);
@@ -97,7 +97,7 @@ export default function Home() {
   const handleVoiceSelect = useCallback((voiceId: string) => {
     console.log('Voice selected:', voiceId);
     setSelectedVoiceId(voiceId);
-    
+
     // Update the TTS config with the new voice ID
     const newTtsConfig = {
       ...ttsConfig,
@@ -110,7 +110,7 @@ export default function Home() {
   const handleSpeedSelect = useCallback((speed: string) => {
     console.log('Speed selected:', speed);
     setSelectedSpeed(speed);
-    
+
     // Update the TTS config with the new speed
     const newTtsConfig = {
       ...ttsConfig,
@@ -123,7 +123,7 @@ export default function Home() {
   const handleEmotionsChange = useCallback((emotions: string[] | null) => {
     console.log('Emotions changed:', emotions);
     setSelectedEmotions(emotions);
-    
+
     // Update the TTS config with the new emotions
     const newTtsConfig = {
       ...ttsConfig,
@@ -206,7 +206,7 @@ export default function Home() {
         if (event.status) {
           addChatMessage(event.status, 'system');
           setConversationStatus(event.status_context?.node || null);
-        
+
           if (event.ui_override) {
             console.log('UI override received:', event.ui_override);
             logSetPendingUIOverride(event.ui_override);
@@ -227,6 +227,48 @@ export default function Home() {
             setEmotionData({
               predictions: event.emotion.prosody.predictions
             });
+
+            // Add emotions as a special message in the chat log
+            if (event.emotion.prosody.predictions[0].emotions) {
+              // Sort emotions by score and take top 5
+              const topEmotions = [...event.emotion.prosody.predictions[0].emotions]
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 5);
+
+              // Format emotion message
+              let emotionMessage = "Prosody emotions: ";
+              topEmotions.forEach((emotion, index) => {
+                emotionMessage += `${emotion.name} (${(emotion.score * 100).toFixed(1)}%)`;
+                if (index < topEmotions.length - 1) {
+                  emotionMessage += ", ";
+                }
+              });
+
+              // Add as a special 'emotion' type message
+              addChatMessage(emotionMessage, 'emotion');
+            }
+          }
+        } else if (event.language_emotion && event.language_emotion.language) {
+          console.log('Language emotion data received:', event.language_emotion);
+          if (event.language_emotion.language.accumulated_emotions) {
+            // Sort emotions by score and take top 5
+            const topLanguageEmotions = [...event.language_emotion.language.accumulated_emotions]
+              .sort((a, b) => b.score - a.score)
+              .slice(0, 5);
+
+            // Format language emotion message
+            if (topLanguageEmotions.length > 0) {
+              let langEmotionMessage = "Semantic emotions: ";
+              topLanguageEmotions.forEach((emotion, index) => {
+                langEmotionMessage += `${emotion.name} (${(emotion.score * 100).toFixed(1)}%)`;
+                if (index < topLanguageEmotions.length - 1) {
+                  langEmotionMessage += ", ";
+                }
+              });
+
+              // Add as a special 'emotion' type message
+              addChatMessage(langEmotionMessage, 'emotion');
+            }
           }
         }
       }
@@ -322,31 +364,31 @@ export default function Home() {
     console.log('Starting connection with TTS config:', ttsConfig);
     setStatusText('Starting connection...');
     setIsConnecting(true);
-    
+
     // Create a new client with the current TTS configuration
     clientInstance = createClient(ttsConfig);
-    
+
     if (!clientInstance) {
       console.error('Failed to create client');
       setStatusText('Failed to create client');
       setIsConnecting(false);
       return;
     }
-    
+
     // Set up event handlers for the new client
     const cleanup = setupEventHandlers(clientInstance);
-    
+
     // Connect the client - this will call our /api/connect endpoint
     clientInstance.connect().catch((err: Error) => {
       console.error('Failed to connect:', err);
       setStatusText(`Connection error: ${err.message}`);
       setIsConnecting(false);
-      
+
       // Clean up event handlers if connection fails
       if (cleanup) {
         cleanup();
       }
-      
+
       // Clean up client
       clientInstance = null;
     });
@@ -356,7 +398,7 @@ export default function Home() {
     if (!clientInstance) return;
     console.log('Stopping connection...');
     setStatusText('Disconnecting...');
-    
+
     clientInstance.disconnect().catch((err: Error) => {
       console.error('Failed to disconnect:', err);
       setStatusText(`Disconnection error: ${err.message}`);
@@ -388,13 +430,13 @@ export default function Home() {
 
         <div className={styles.voiceSettingsContainer}>
           <div className={styles.voiceSelectionContainer}>
-            <VoiceSelector 
-              onVoiceSelect={handleVoiceSelect} 
+            <VoiceSelector
+              onVoiceSelect={handleVoiceSelect}
               initialVoiceId={selectedVoiceId}
               apiKey={CARTESIA_API_KEY}
             />
           </div>
-          
+
           <VoiceSettingsPanel
             selectedSpeed={selectedSpeed}
             selectedEmotions={selectedEmotions}
@@ -406,7 +448,7 @@ export default function Home() {
         {participantId ? (
           <>
             <div className={styles.sessionInfo}>
-              <strong>Participant in session</strong> 
+              <strong>Participant in session</strong>
             </div>
             <div className={styles.scriptInfo}>
               <strong>Script stage:</strong> {conversationStatus}
@@ -438,27 +480,31 @@ export default function Home() {
         {clientInstance ? (
           <RTVIClientProvider client={clientInstance}>
             <RTVIClientAudio />
-            <ChatLog 
+            <ChatLog
               messages={chatMessages}
               isWaitingForUser={isWaitingForUser}
               isUserSpeaking={isUserSpeaking}
               uiOverride={uiOverride}
+              emotionData={emotionData}
             />
           </RTVIClientProvider>
         ) : (
-          <ChatLog 
+          <ChatLog
             messages={chatMessages}
             isWaitingForUser={isWaitingForUser}
             isUserSpeaking={isUserSpeaking}
             uiOverride={uiOverride}
+            emotionData={null}
           />
         )}
-        
-        {/* Emotion Tracker Component */}
+
+        {/* 
+        Emotion Tracker Component - Keeping component in project but not displaying it
         {isConnected && (
           <EmotionTracker emotionData={emotionData} />
         )}
-        
+        */}
+
         {(isConnecting || isWaitingForParticipant) && (
           <LoadingSpinner message="Waiting for Sphinx to join..." />
         )}

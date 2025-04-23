@@ -27,7 +27,7 @@ from pipecat.services.elevenlabs import ElevenLabsTTSService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyTransport, DailyParams
 from pipecat.services.whisper.stt import WhisperSTTService, Model
-from pipecat.processors.frameworks.rtvi import RTVIProcessor, RTVIConfig, RTVIObserver, RTVIMessage, RTVIAction, RTVIActionArgument
+from pipecat.processors.frameworks.rtvi import RTVIProcessor, RTVIConfig, RTVIObserver, RTVIMessage, RTVIAction, RTVIActionArgument,RTVIServerMessageFrame
 from pipecat_flows import FlowManager
 from sphinx_script_dynamic import create_initial_node
 from status_utils import status_updater
@@ -40,7 +40,7 @@ import json
 import base64
 from pipecat.transports.services.helpers.daily_rest import DailyRESTHelper, DailyRoomParams
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
-from hume_offline_processor import HumeOfflineWebSocketProcessor
+from hume_offline_observer import HumeOfflineWebSocketObserver
 
 
 load_dotenv(override=True)
@@ -100,60 +100,6 @@ class SessionTimeoutHandler:
             logger.info("TTS completed and EndFrame pushed successfully.")
         except Exception as e:
             logger.error(f"Error during call termination: {e}")
-
-
-class CustomRTVIProcessor(RTVIProcessor):
-    def __init__(self, config):
-        super().__init__(config=config)
-        self.flow_manager = None  # Access node config (task messages)
-        self.speech_count = 0            # Track TextFrames sent to TTS
-        self.is_final = False
-        self.hume_processor = None
-
-    def set_flow_manager(self, flow_manager):
-        self.flow_manager = flow_manager
-
-    def set_hume_offline_processor(self, hume_processor):
-        self.hume_processor = hume_processor
-        self.hume_processor.set_rtvi(self)
-
-    async def process_frame(self, frame, direction):
-        # Handle outbound frames (server-to-client)
-        #logger.info(f"Processing frame: {frame} direction: {direction}")
-
-        #if direction == FrameDirection.UPSTREAM:
-        #    if isinstance(frame, BotStoppedSpeakingFrame) and self.flow_manager:
-        #        # Check if this is the final speech segment
-        #        logger.info(f"BotStoppedSpeakingFrame received: {self.speech_count}")
-        #        # Get current node configuration properly
-        #        logger.info(f"Current node: {self.flow_manager.current_node}")
-        #        logger.info(f"Nodes: {self.flow_manager.nodes}")
-        #        if self.flow_manager.current_node and self.flow_manager.current_node in self.flow_manager.nodes:
-        #            self.speech_count += 1
-        #            current_node_config = self.flow_manager.nodes[self.flow_manager.current_node]
-        #            total_messages = len(current_node_config.get("task_messages", []))
-        #            if self.speech_count == total_messages:
-        #                logger.info(f"Final speech segment received: {self.speech_count}")
-        #                await status_updater.trigger_ui_override()                  # Send a message to the client to display ui_override
-        #                self.speech_count = 0
-        #                self.is_final = False
-
-        # Existing logic for inbound frames (client-to-server)
-        #if direction == FrameDirection.DOWNSTREAM and hasattr(frame, 'label') and frame.label == "rtvi-ai":
-        #    if frame.type == "sphinx_text_input":  # For button clicks
-        #        text = frame.data.get("text", "")
-        #        if text:
-        #            await self.queue_frame(TextFrame(text))
-        #    elif frame.type == "sphinx_list_selection":  # For dropdown selections
-        #        selection = frame.data.get("selection", "")
-        #       if selection:
-        #            await self.queue_frame(TextFrame(selection))
-
-        if self.hume_processor:
-            await self.hume_processor.process_frame(frame, direction)
-        # Pass the frame to the parent class for default processing
-        return await super().process_frame(frame, direction)
-
 
 
 
@@ -291,14 +237,12 @@ async def run_bot(room_url, token, identifier, data=None):
     context = OpenAILLMContext(messages)
     context_aggregator = llm.create_context_aggregator(context)
 
-    rtvi = CustomRTVIProcessor(config=RTVIConfig(config=[]))
+    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
     await status_updater.initialize(rtvi, identifier, room_url)
-    hume_processor = HumeOfflineWebSocketProcessor(api_key=os.getenv("HUME_API_KEY"))
-    rtvi.set_hume_offline_processor(hume_processor)
+    hume_observer = HumeOfflineWebSocketObserver(api_key=os.getenv("HUME_API_KEY"), rtvi=rtvi)
     conversation_pipeline = Pipeline(
         [
             transport.input(),  # Websocket input from client
-            #hume_processor,
             rtvi,
             stt,  # Speech-To-Text
             context_aggregator.user(),
@@ -306,7 +250,6 @@ async def run_bot(room_url, token, identifier, data=None):
             tts,  # Text-To-Speech
             transport.output(),  # Websocket output to client
             context_aggregator.assistant(),
-
         ]
     )
 
@@ -317,7 +260,7 @@ async def run_bot(room_url, token, identifier, data=None):
             audio_out_sample_rate=48000,
             allow_interruptions=False,
         ),
-        observers=[RTVIObserver(rtvi)]
+        observers=[RTVIObserver(rtvi), hume_observer]
     )
 
     flow_manager = CustomFlowManager(
@@ -327,7 +270,7 @@ async def run_bot(room_url, token, identifier, data=None):
         tts=tts
     )
 
-    rtvi.set_flow_manager(flow_manager)
+    #rtvi.set_flow_manager(flow_manager)
 
     async def handle_uioverride_response(processor, service, arguments):
         """Handler for UI override response action"""
@@ -348,11 +291,114 @@ async def run_bot(room_url, token, identifier, data=None):
 
     rtvi.register_action(uioverride_response_action)
 
+    @hume_observer.event_handler("on_start_processing_emotions")
+    async def on_start_processing_emotions(hume_processor):
+        logger.info("Starting to process emotions")
+        # Reset accumulated emotions
+        flow_manager.state["emotions_summary"] = ""
+        flow_manager.state["emotions_fully_processed"] = False
+        # Initialize emotion storage for prosody and language
+        flow_manager.state["prosody_emotions"] = None
+        flow_manager.state["language_emotions"] = None
+
+    # Helper function to combine emotions and generate a summary
+    async def process_combined_emotions():
+        try:
+            prosody_emotions = flow_manager.state.get("prosody_emotions")
+            language_emotions = flow_manager.state.get("language_emotions")
+            
+            # If we don't have both sets of emotions yet, we can't proceed
+            if not prosody_emotions or not language_emotions:
+                logger.info("Still waiting for both prosody and language emotions")
+                return
+            
+            logger.info("Both prosody and language emotions received, generating combined summary")
+            
+            # Create dictionaries from both emotion lists for easier matching
+            prosody_dict = {emotion.get("name"): emotion.get("score", 0) for emotion in prosody_emotions}
+            language_dict = {emotion.get("name"): emotion.get("score", 0) for emotion in language_emotions}
+            
+            # Multiply matching emotions together
+            combined_emotions = {}
+            for emotion_name in set(prosody_dict.keys()).union(language_dict.keys()):
+                prosody_score = prosody_dict.get(emotion_name, 0)
+                language_score = language_dict.get(emotion_name, 0)
+                
+                # If both scores exist, multiply them; otherwise use a weighted combination
+                if prosody_score > 0 and language_score > 0:
+                    # Multiply scores and scale to keep in reasonable range
+                    combined_score = (prosody_score * language_score) ** 0.5  # Square root to normalize scale
+                else:
+                    # If only one score exists, use it at 70% strength
+                    combined_score = max(prosody_score, language_score) * 0.7
+                
+                combined_emotions[emotion_name] = combined_score
+            
+            # Sort emotions by combined score and take top 3
+            top_emotions = sorted(combined_emotions.items(), key=lambda x: x[1], reverse=True)[:3]
+            
+            # Create a readable summary
+            if len(top_emotions) >= 3:
+                summary = f"{top_emotions[0][0]}, {top_emotions[1][0]} and {top_emotions[2][0]}"
+            elif len(top_emotions) == 2:
+                summary = f"{top_emotions[0][0]} and {top_emotions[1][0]}"
+            elif len(top_emotions) == 1:
+                summary = top_emotions[0][0]
+            else:
+                summary = "No significant emotions detected"
+            
+            logger.info(f"Combined emotion summary: {summary}")
+            flow_manager.state["emotions_summary"] = summary
+            
+            # Mark emotions as fully processed
+            flow_manager.state["emotions_fully_processed"] = True
+            
+        except Exception as e:
+            logger.error(f"Error processing combined emotions: {e}")
+
+    @hume_observer.event_handler("on_emotions_received")
+    async def on_emotions_received(hume_observer, prosody_data):
+        logger.info(f"Prosody emotions received: {prosody_data}")
+        try:
+            # Send emotions to client for displaying
+            message = {
+                "emotion": prosody_data
+            }
+            status_frame = RTVIServerMessageFrame(message)
+            await rtvi.push_frame(status_frame)               
+            
+            # Store prosody emotions
+            preds = prosody_data.get("prosody", {}).get("predictions", [])
+            if preds and len(preds) > 0 and "emotions" in preds[0]:
+                flow_manager.state["prosody_emotions"] = preds[0].get("emotions", [])
+                
+                # Try to process combined emotions if we have both sets
+                await process_combined_emotions()
+            
+        except Exception as e:
+            logger.error(f"Error processing prosody emotions: {e}")
     
-    #@audiobuffer.event_handler("on_audio_data")
-    #async def on_audio_data(buffer, audio, sample_rate, num_channels):
-    #    logger.info(f"Audio data received: {len(audio)} bytes")
-    #    await hume_client.send_audio_buffer(audio, sample_rate, num_channels)
+    @hume_observer.event_handler("on_language_emotions_received")
+    async def on_language_emotions_received(hume_observer, language_data):
+        logger.info(f"Language emotions received: {language_data}")
+        try:
+            # Send language emotions to client for displaying
+            message = {
+                "language_emotion": language_data
+            }
+            status_frame = RTVIServerMessageFrame(message)
+            await rtvi.push_frame(status_frame)
+            
+            # Store language emotions
+            accumulated_emotions = language_data.get("language", {}).get("accumulated_emotions", [])
+            if accumulated_emotions:
+                flow_manager.state["language_emotions"] = accumulated_emotions
+                
+                # Try to process combined emotions if we have both sets
+                await process_combined_emotions()
+                
+        except Exception as e:
+            logger.error(f"Error processing language emotion data: {e}")
 
     @transport.event_handler("on_participant_joined")
     async def on_participant_joined(transport, participant):
