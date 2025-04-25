@@ -11,6 +11,7 @@ import VoiceSelector from '@/components/VoiceSelector';
 import VoiceSettingsPanel from '@/components/VoiceSettingsPanel';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmotionTracker, { EmotionData } from '@/components/EmotionTracker';
+import InterviewData from '@/components/InterviewData';
 
 // Import types
 import { TTSConfig } from '@/types';
@@ -78,6 +79,12 @@ export default function Home() {
   const [emotionData, setEmotionData] = useState<EmotionData | null>(null);
   const eventHandlersAttached = useRef(false);
   const initialMessageSent = useRef(false);
+  const [interviewData, setInterviewData] = useState({
+    name: null as string | null,
+    challenge: null as string | null,
+    envisionedState: null as string | null,
+    emotions: null as string[] | null
+  });
 
   // Custom setter to log all updates to pendingUIOverride
   const logSetPendingUIOverride = useCallback((newValue: any | null) => {
@@ -200,10 +207,22 @@ export default function Home() {
     };
 
     const handleServerMessage = (event: any) => {
-      console.log('Server message received:', event);
+      console.log('Received server message:', event);
+      if (event.status && event.status_context?.data) {
+        console.log('State update received in status_context:', event.status_context.data);
+        // Update interview data based on state changes
+        setInterviewData(prev => ({
+          ...prev,
+          name: event.status_context.data.name || prev.name,
+          challenge: event.status_context.data.challenge || prev.challenge,
+          envisionedState: event.status_context.data.envisioned_state || prev.envisionedState,
+          emotions: event.status_context.data.emotions || prev.emotions
+        }));
+      }
       if (event) {
         // It's either status or trigger or emotion
         if (event.status) {
+          console.log('Status update:', event.status, 'Context:', event.status_context);
           addChatMessage(event.status, 'system');
           setConversationStatus(event.status_context?.node || null);
         
@@ -438,20 +457,36 @@ export default function Home() {
         {clientInstance ? (
           <RTVIClientProvider client={clientInstance}>
             <RTVIClientAudio />
-            <ChatLog 
+            <div className={styles.chatSection}>
+              <ChatLog
+                messages={chatMessages}
+                isWaitingForUser={isWaitingForUser}
+                isUserSpeaking={isUserSpeaking}
+                uiOverride={uiOverride}
+              />
+              <InterviewData
+                name={interviewData.name}
+                challenge={interviewData.challenge}
+                envisionedState={interviewData.envisionedState}
+                emotions={interviewData.emotions}
+              />
+            </div>
+          </RTVIClientProvider>
+        ) : (
+          <div className={styles.chatSection}>
+            <ChatLog
               messages={chatMessages}
               isWaitingForUser={isWaitingForUser}
               isUserSpeaking={isUserSpeaking}
               uiOverride={uiOverride}
             />
-          </RTVIClientProvider>
-        ) : (
-          <ChatLog 
-            messages={chatMessages}
-            isWaitingForUser={isWaitingForUser}
-            isUserSpeaking={isUserSpeaking}
-            uiOverride={uiOverride}
-          />
+            <InterviewData
+              name={interviewData.name}
+              challenge={interviewData.challenge}
+              envisionedState={interviewData.envisionedState}
+              emotions={interviewData.emotions}
+            />
+          </div>
         )}
         
         {/* Emotion Tracker Component */}

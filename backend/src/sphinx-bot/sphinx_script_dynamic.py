@@ -36,9 +36,11 @@ FLOW_STATES = {
            {{"status": "incomplete", "needs_more_info": true}}
         
         IMPORTANT: 
+        - When the user provides a name, you MUST return it with needs_confirmation set to true
         - When the user confirms their name, you MUST return the previously stored name with needs_confirmation set to false
         - The result field MUST contain the name, even for confirmations
-        - Never return needs_more_info for a confirmation"""
+        - Never return needs_more_info for a confirmation
+        - The task is not complete until the name is confirmed"""
     },
     "identify_challenge": {
         "task": "Help the participant identify their current challenge state",
@@ -59,7 +61,24 @@ FLOW_STATES = {
         "suggested_language": "Consider your thoughts. Is there one you wish you could avoid, one that calls for attention but makes you feel stuck, disconnected, or out of balance? What wisdom can be found if you hold that thought with love and care for all of who you are, from your heart center? Is there a current challenge you're facing that is associated with that thought? Which of these challenging states listed on this poster resonate with you at this moment?",
         "confirmation_prompt": "From what you've shared, it sounds like {challenge} is present for you. Does this feel accurate?",
         "next_state": "record_challenge_feeling",
-        "evaluation_instructions": "Match the user's description to one of the available challenge states. If a match is found, return it as the result. If no clear match is found, indicate more information is needed."
+        "evaluation_instructions": """When evaluating the user's input:
+        1. If the input matches one of the available challenge states, return:
+           {{"status": "success", "result": "matched_challenge", "needs_confirmation": true}}
+        
+        2. If the input is a confirmation (e.g., 'Yes', 'That's correct', 'Yes that's correct', 'Yes that's great', 'Correct', 'That's right'), return:
+           {{"status": "success", "result": "previously_stored_challenge", "needs_confirmation": false}}
+        
+        3. If the input is a denial (e.g., 'No', 'That's not right', 'That's not correct'), return:
+           {{"status": "incomplete", "needs_more_info": true}}
+        
+        4. For any other input, return:
+           {{"status": "incomplete", "needs_more_info": true}}
+        
+        IMPORTANT: 
+        - When the user describes a challenge, you MUST return the exact matching challenge from the options list
+        - When the user confirms their challenge, you MUST return the previously stored challenge
+        - The result field MUST contain the actual challenge, not a placeholder
+        - Never return needs_more_info for a confirmation"""
     },
     "record_challenge_feeling": {
         "task": "Guide the participant in describing their challenge experience",
@@ -127,7 +146,7 @@ async def evaluate_task_with_llm(state_name: str, user_input: str, options: list
         evaluation_instructions = state.get("evaluation_instructions", "")
         
         # Create the system message based on the task
-        system_message = f"""You are a therapeutic guide evaluating if a task is complete. 
+        system_message = f"""You are  evaluating if a task is complete. 
         Current task: {task}
         
         Your role is to:
@@ -257,6 +276,13 @@ def create_callback_for_state(state_name: str):
             # We need to confirm the user's input
             confirmation_prompt = state["confirmation_prompt"].format(**flow_manager.state)
             await flow_manager.set_node(state_name, create_node_for_state(state_name, confirmation_prompt))
+            
+            # Send state update to frontend
+            logger.info(f"Sending state update with data: {flow_manager.state}")
+            await status_updater.update_status(
+                f"Stage {state_name} active",
+                context={"node": state_name, "data": flow_manager.state}
+            )
             return
             
         if result.get("needs_more_info"):
@@ -270,23 +296,37 @@ def create_callback_for_state(state_name: str):
             return
             
         if result["status"] == "success" and result.get("result"):
-            # Store the result in the state
-            if state_name == "greeting":
-                # For greeting state, store the name in the correct key
-                flow_manager.state["name"] = result["result"]
-            elif state_name == "identify_challenge":
-                # For identify_challenge state, store the challenge in the correct key
-                flow_manager.state["challenge"] = result["result"]
+            # For confirmations, keep the existing stored value
+            if not result.get("needs_confirmation"):
+                # Move to the next state if available
+                next_state = state.get("next_state")
+                if next_state:
+                    await flow_manager.set_node(next_state, create_node_for_state(next_state))
+                    # Send state update to frontend with the new state
+                    logger.info(f"Sending state update with data: {flow_manager.state}")
+                    await status_updater.update_status(
+                        f"Stage {next_state} active",
+                        context={"node": next_state, "data": flow_manager.state}
+                    )
+                else:
+                    # We've reached the end of the flow
+                    await flow_manager.set_node(state_name, create_node_for_state(state_name))
+                    # Send final state update to frontend
+                    logger.info(f"Sending state update with data: {flow_manager.state}")
+                    await status_updater.update_status(
+                        f"Stage {state_name} active",
+                        context={"node": state_name, "data": flow_manager.state}
+                    )
             else:
-                flow_manager.state[state_name] = result["result"]
-            
-            # Move to the next state if available
-            next_state = state.get("next_state")
-            if next_state:
-                await flow_manager.set_node(next_state, create_node_for_state(next_state))
-            else:
-                # We've reached the end of the flow
-                await flow_manager.set_node(state_name, create_node_for_state(state_name))
+                # For new inputs, store the result
+                if state_name == "greeting":
+                    # For greeting state, store the name in the correct key
+                    flow_manager.state["name"] = result["result"]
+                elif state_name == "identify_challenge":
+                    # For identify_challenge state, store the challenge in the correct key
+                    flow_manager.state["challenge"] = result["result"]
+                else:
+                    flow_manager.state[state_name] = result["result"]
     
     return callback
 
