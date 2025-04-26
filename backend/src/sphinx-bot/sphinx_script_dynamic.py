@@ -13,14 +13,58 @@ llm_service = OpenAILLMService(
     api_key=os.getenv("OPENAI_API_KEY")
 )
 
+# Define the mapping of challenges to empowered states
+CHALLENGE_TO_EMPOWERED_STATES = {
+    "Fearful / Anxious": ["Confident", "Experimental / Risking", "Courageous", "Leadership"],
+    "Stagnant / Ruminating": ["Experimental / Risking", "Spontaneous / Decisive", "Enthusiastic"],
+    "Disassociated / Numb": ["Engaged", "Curious", "Feeling / Empathetic"],
+    "Unhealthy": ["Full Capacity", "Energetic", "Honoring Body"],
+    "Scarcity": ["Generous / Giving", "Indulging in Pleasure", "Investing", "Experimental / Risking"],
+    "Excluded": ["Respected", "Trusting Others", "Leadership", "Receiving", "Communing with a group"],
+    "Lack of Control/Agency": ["Experimental / Risking", "Accepting Change", "Trusting Others", "Leadership", "Relaxed"],
+    "Disembodied / Ungrounded": ["Honoring Body", "Joyful physical expression", "Focused Clarity", "Enthusiastic"],
+    "Obsessed": ["Relaxed", "Accepting Change", "Experimental"],
+    "Silenced / Unheard": ["Leadership", "Confident", "Receiving"],
+    "Lack of Purpose / Unmotivated": ["Enthusiastic", "Leadership", "Focused Clarity"],
+    "Shameful": ["Self-Love / Pride", "Leadership", "Confident", "Honoring Body", "Receiving"]
+}
+
+def get_empowered_states_for_challenge(challenge: str) -> list:
+    """Get the list of empowered states for a given challenge."""
+    states = CHALLENGE_TO_EMPOWERED_STATES.get(challenge, [])
+    logger.info(f"[Debug] Getting empowered states for challenge '{challenge}': {states}")
+    return states
+
 # Define the structure for each state in the flow
 FLOW_STATES = {
     "greeting": {
-        "task": "Welcome the participant and create a safe, somatic space",
+        "task": "Welcome the participant and wait for them to indicate readiness",
         "options": None,
-        "suggested_language": "Welcome Seeker. To begin your quest, we invite you to ground and center with a few deep breaths: Inhale-3-4-5, Exhale-3-4-5, Inhale-3-4-5, exhale-3-4-5, inhale-3-4-5, exhale-3-4-5. Know that you are safe here in your center. You're doing great! What is your name?",
+        "suggested_language": "Welcome Seeker. To begin your quest, we invite you to ground and center with a few deep breaths: Inhale-3-4-5, Exhale-3-4-5, Inhale-3-4-5, exhale-3-4-5, inhale-3-4-5, exhale-3-4-5. Know that you are safe here in your center. You're doing great! When you are ready to begin, please say 'I am ready'.",
+        "confirmation_prompt": None,
+        "retry_prompt": None,
+        "denial_prompt": None,
+        "next_state": "collect_name",
+        "evaluation_instructions": """When evaluating the user's input:
+        1. If the input indicates readiness in any way (e.g., 'I am ready', 'I'm ready', 'Yes, I'm ready', 'Let's do it', 'Ready', 'I'm ready to begin', 'Yes, ready'), return:
+           {{"status": "success", "result": "ready", "needs_confirmation": false}
+        
+        2. For any other input, return:
+           {{"status": "incomplete", "needs_more_info": true}}
+        
+        IMPORTANT: 
+        - The task is complete when the user indicates they are ready in ANY way
+        - No confirmation is needed for this state
+        - When the user indicates readiness in any form, you MUST set user_ready to true
+        - Do not ask for more information if the user has clearly indicated readiness"""
+    },
+    "collect_name": {
+        "task": "Collect and confirm the participant's name",
+        "options": None,
+        "suggested_language": "Before we get started, please tell me your name?",
         "confirmation_prompt": "I heard your name is {name}. Is that correct?",
         "retry_prompt": "I didn't quite catch that. Could you please tell me your name again?",
+        "denial_prompt": "I apologize for the mistake. Could you please tell me your name again?",
         "next_state": "identify_challenge",
         "evaluation_instructions": """When evaluating the user's input:
         1. If the input is a name (e.g., 'My name is John' or just 'John'), return:
@@ -43,7 +87,7 @@ FLOW_STATES = {
         - The task is not complete until the name is confirmed"""
     },
     "identify_challenge": {
-        "task": "Help the participant identify their current challenge state",
+        "task": "Help the participant identify their current challenge state and associated emotions",
         "options": [
             "Fearful / Anxious",
             "Stagnant / Ruminating",
@@ -59,8 +103,10 @@ FLOW_STATES = {
             "Shameful"
         ],
         "suggested_language": "Consider your thoughts. Is there one you wish you could avoid, one that calls for attention but makes you feel stuck, disconnected, or out of balance? What wisdom can be found if you hold that thought with love and care for all of who you are, from your heart center? Is there a current challenge you're facing that is associated with that thought? Which of these challenging states listed on this poster resonate with you at this moment?",
-        "confirmation_prompt": "From what you've shared, it sounds like {challenge} is present for you. Does this feel accurate?",
-        "next_state": "record_challenge_feeling",
+        "confirmation_prompt": "From what you've shared, it sounds like {challenge} is present for you, and you're feeling {challenge_emotions}. Does this feel accurate?",
+        "retry_prompt": "I didn't quite catch that. Could you please describe your challenge again?",
+        "denial_prompt": "I apologize for misunderstanding. Could you please describe your challenge again?",
+        "next_state": "identify_empowered_state",
         "evaluation_instructions": """When evaluating the user's input:
         1. If the input matches one of the available challenge states, return:
            {{"status": "success", "result": "matched_challenge", "needs_confirmation": true}}
@@ -80,62 +126,72 @@ FLOW_STATES = {
         - The result field MUST contain the actual challenge, not a placeholder
         - Never return needs_more_info for a confirmation"""
     },
-    "record_challenge_feeling": {
-        "task": "Guide the participant in describing their challenge experience",
-        "options": None,
-        "suggested_language": "Please describe what this challenge is like for you. When you are ready to speak your truth, hold your hand out and your guide will start your interactive AI recording sequence. Don't worry, these recordings are only for our system – they will not be saved or shared with any person or 3rd party.",
-        "confirmation_prompt": "Would you like to share more about how this challenge affects you?",
-        "next_state": "confirm_challenge_emotions"
-    },
-    "confirm_challenge_emotions": {
-        "task": "Help the participant identify emotions associated with their challenge",
-        "options": [
-            "Admiration", "Adoration", "Aesthetic Appreciation", "Amusement", "Anger", "Anxiety", "Awe", "Awkwardness", "Boredom", "Calmness", "Concentration", "Confusion", "Contemplation", "Contempt", "Contentment", "Craving", "Desire", "Determination", "Disappointment", "Disgust", "Distress", "Doubt", "Ecstasy", "Embarrassment", "Empathic Pain", "Entrancement", "Envy", "Excitement", "Fear", "Guilt", "Horror", "Interest", "Joy", "Love", "Nostalgia", "Pain", "Pride", "Realization", "Relief", "Romance", "Sadness", "Satisfaction", "Shame", "Surprise", "Sympathy", "Tiredness", "Triumph", "Vulnerability", "Worry"
-        ],
-        "suggested_language": "It sounds like you're feeling {emotions} from experiencing {challenge}. Is that true? If not, do any of these words describe your feelings?",
-        "confirmation_prompt": "Would you like to explore any other emotions you're experiencing?",
-        "next_state": "identify_envisioned_state"
-    },
-    "identify_envisioned_state": {
+    "identify_empowered_state": {
         "task": "Guide the participant in envisioning their desired future state",
-        "options": {
-            "Fearful / Anxious": ["Confident", "Experimental / Risking", "Courageous", "Leadership"],
-            "Stagnant / Ruminating": ["Experimental / Risking", "Spontaneous / Decisive", "Enthusiastic"],
-            "Disassociated / Numb": ["Engaged", "Curious", "Feeling / Empathetic"],
-            "Unhealthy": ["Full Capacity", "Energetic", "Honoring Body"],
-            "Scarcity": ["Generous / Giving", "Indulging in Pleasure", "Investing", "Experimental / Risking"],
-            "Excluded": ["Respected", "Trusting Others", "Leadership", "Receiving", "Communing with a group"],
-            "Lack of Control/Agency": ["Experimental / Risking", "Accepting Change", "Trusting Others", "Leadership", "Relaxed"],
-            "Disembodied / Ungrounded": ["Honoring Body", "Joyful physical expression", "Focused Clarity", "Enthusiastic"],
-            "Obsessed": ["Relaxed", "Accepting Change", "Experimental"],
-            "Silenced / Unheard": ["Leadership", "Confident", "Receiving"],
-            "Lack of Purpose / Unmotivated": ["Enthusiastic", "Leadership", "Focused Clarity"],
-            "Shameful": ["Self-Love / Pride", "Leadership", "Confident", "Honoring Body", "Receiving"]
-        },
+        "options": None,  # We'll get these dynamically based on the challenge
         "suggested_language": "What if your challenges are just the beginning of a quest? What treasures will you gain along the way? Envisioning what you seek will help you find your path. When you have passed through this challenge, what will you be like? How will you feel? How will you live your life on the other side of this experience?",
-        "confirmation_prompt": "It sounds like you will feel {envisioned_state}. Is this correct? If not, can you choose one or more states or feelings from this list that you imagine you will experience because you transformed through this challenge?",
-        "next_state": "confirm_envisioned_emotions"
-    },
-    "confirm_envisioned_emotions": {
-        "task": "Help the participant identify emotions associated with their envisioned state",
-        "options": [
-            "Admiration", "Adoration", "Aesthetic Appreciation", "Amusement", "Anger", "Anxiety", "Awe", "Awkwardness", "Boredom", "Calmness", "Concentration", "Confusion", "Contemplation", "Contempt", "Contentment", "Craving", "Desire", "Determination", "Disappointment", "Disgust", "Distress", "Doubt", "Ecstasy", "Embarrassment", "Empathic Pain", "Entrancement", "Envy", "Excitement", "Fear", "Guilt", "Horror", "Interest", "Joy", "Love", "Nostalgia", "Pain", "Pride", "Realization", "Relief", "Romance", "Sadness", "Satisfaction", "Shame", "Surprise", "Sympathy", "Tiredness", "Triumph", "Vulnerability", "Worry"
-        ],
-        "suggested_language": "I sense that {emotions} are present in your vision of your future state. Does this resonate with you?",
-        "confirmation_prompt": "Would you like to explore any other emotions you envision experiencing?",
-        "next_state": "goodbye"
+        "confirmation_prompt": "It sounds like you will feel {empowered_state} and experience {empowered_emotions}. Is this correct?",
+        "retry_prompt": "I didn't quite catch that. Could you please describe your envisioned state again?",
+        "denial_prompt": "I apologize for misunderstanding. Could you please describe your envisioned state again?",
+        "next_state": "goodbye",
+        "evaluation_instructions": """When evaluating the user's input:
+        1. If the user describes their envisioned state, analyze their response as a therapist would:
+           - Look for themes, emotions, and qualities they're describing
+           - Consider how their vision represents growth from their current challenge
+           - Match their described qualities to one of the available empowered states
+           
+           - For the current challenge state "{challenge}", the available empowered states are: [OPTIONS]
+           
+           - If you can identify a match from the options list, return:
+             {{"status": "success", "result": "matched_state", "needs_confirmation": true}}
+        
+        2. If the input is a confirmation (e.g., 'Yes', 'That's correct', 'Yes that's correct', 'Yes that's great', 'Correct', 'That's right'), return:
+           {{"status": "success", "result": "previously_stored_state", "needs_confirmation": false}}
+        
+        3. If the input is a denial (e.g., 'No', 'That's not right', 'That's not correct'), return:
+           {{"status": "incomplete", "needs_more_info": true}}
+        
+        4. For any other input, return:
+           {{"status": "incomplete", "needs_more_info": true}}
+        
+        IMPORTANT: 
+        - Act as a therapist interpreting the user's vision
+        - Look for underlying themes and qualities in their response
+        - Consider how their vision represents growth from their current challenge
+        - Match their described qualities to the available empowered states
+        - The result field MUST contain the exact state from the options list
+        - Never return needs_more_info for a confirmation
+        - The options available depend on the current challenge state
+        - If the user mentions a state that matches any of these options, even partially, return that exact option
+        - For example, if the user says 'I want to trust others' and 'Trusting Others' is in the options list, return 'Trusting Others' as the result
+        - When the user selects a state, you MUST set needs_confirmation to true to move to the confirmation phase
+        - The confirmation phase is crucial - it allows the user to confirm their selection before moving forward
+        - If the user has selected a state, you MUST move to confirmation by setting needs_confirmation to true
+        """
     },
     "goodbye": {
         "task": "Conclude the session and prepare for video experience",
         "options": None,
         "suggested_language": "Thank you for sharing and taking the time to explore your inner landscape! Now please let your guide know you are ready to view your destiny.",
         "confirmation_prompt": None,
-        "next_state": None
+        "retry_prompt": None,
+        "denial_prompt": None,
+        "next_state": None,
+        "evaluation_instructions": """When evaluating the user's input:
+        1. If the input indicates readiness (e.g., 'I am ready', 'Yes, I'm ready', 'Let's do it'), return:
+           {{"status": "success", "result": "ready", "needs_confirmation": false}}
+        
+        2. For any other input, return:
+           {{"status": "incomplete", "needs_more_info": true}}
+        
+        IMPORTANT: 
+        - The task is complete when the user indicates they are ready
+        - No confirmation is needed for this state"""
     }
 }
 
-async def evaluate_task_with_llm(state_name: str, user_input: str, options: list = None) -> dict:
-    """Use the LLM to evaluate if the task is complete and extract the result."""
+async def evaluate_task_with_llm(state_name: str, user_input: str, options: list = None, flow_manager: FlowManager = None) -> dict:
+    """Use the LLM to evaluate if a task is complete and extract the result."""
     try:
         # Create a context for the LLM
         context = OpenAILLMContext()
@@ -145,8 +201,23 @@ async def evaluate_task_with_llm(state_name: str, user_input: str, options: list
         task = state["task"]
         evaluation_instructions = state.get("evaluation_instructions", "")
         
+        # For identify_empowered_state, get only the options for the current challenge
+        if state_name == "identify_empowered_state" and flow_manager and flow_manager.state and "challenge" in flow_manager.state:
+            current_challenge = flow_manager.state["challenge"]
+            # Get the empowered states for this challenge
+            empowered_states = get_empowered_states_for_challenge(current_challenge)
+            # Format the options string
+            options_str = ", ".join([f"'{state}'" for state in empowered_states])
+            # Replace the placeholders in the evaluation instructions
+            evaluation_instructions = evaluation_instructions.replace("{challenge}", current_challenge)
+            evaluation_instructions = evaluation_instructions.replace("[OPTIONS]", options_str)
+            # Use the empowered states as the options
+            options = empowered_states
+            logger.info(f"[LLM] Current challenge: {current_challenge}")
+            logger.info(f"[LLM] Available empowered states: {empowered_states}")
+        
         # Create the system message based on the task
-        system_message = f"""You are  evaluating if a task is complete. 
+        system_message = f"""You are evaluating if a task is complete. 
         Current task: {task}
         
         Your role is to:
@@ -156,7 +227,7 @@ async def evaluate_task_with_llm(state_name: str, user_input: str, options: list
         
         {evaluation_instructions}
         
-        Available options: {', '.join(options) if options else 'N/A'}
+        Available options: {', '.join([f"'{opt}'" for opt in (options or [])]) or 'N/A'}
         
         Respond with one of these formats:
         1. If a match is found:
@@ -171,6 +242,10 @@ async def evaluate_task_with_llm(state_name: str, user_input: str, options: list
         4. If user denies a match:
         {{"status": "incomplete", "needs_more_info": true}}
         """
+        
+        logger.info(f"[LLM] System message: {system_message}")
+        logger.info(f"[LLM] User input: {user_input}")
+        logger.info(f"[LLM] Options being used: {options}")
         
         # Create the messages for the LLM
         messages = [
@@ -188,9 +263,12 @@ async def evaluate_task_with_llm(state_name: str, user_input: str, options: list
                 if chunk.choices[0].delta.content:
                     full_response += chunk.choices[0].delta.content
         
+        logger.info(f"[LLM] Raw response: {full_response}")
+        
         # Parse the JSON response
         try:
             result = json.loads(full_response.strip())
+            logger.info(f"[LLM] Parsed result: {result}")
             return result
         except json.JSONDecodeError:
             logger.error(f"Error parsing LLM response: {full_response}")
@@ -205,34 +283,61 @@ def create_handler_for_state(state_name: str):
     """Create a handler function for a specific state."""
     async def handler(args: FlowArgs) -> FlowResult:
         user_input = args.get("user_input", "").lower()
+        is_ui_override = args.get("is_ui_override", False)
+        flow_manager = args.get("flow_manager")
         
-        # For greeting state, we don't need to evaluate anything until we get user input
+        logger.info(f"[Handler] State: {state_name}")
+        logger.info(f"[Handler] User input: {user_input}")
+        logger.info(f"[Handler] UI override: {is_ui_override}")
+        
+        # For greeting state, handle UI override directly
         if state_name == "greeting":
-            if not user_input:
+            if is_ui_override:
                 return {
                     "status": "success",
-                    "user_ready": False
+                    "result": "ready",
+                    "needs_confirmation": False
                 }
-            # Check if this is a UI override action
-            if user_input == "i am ready":
+            # For spoken input, use LLM to evaluate
+            return await evaluate_task_with_llm(state_name, user_input)
+        
+        # For collect_name state, handle UI override directly
+        if state_name == "collect_name":
+            if is_ui_override:
                 return {
                     "status": "success",
-                    "user_ready": True
+                    "result": user_input,
+                    "needs_confirmation": True
                 }
+            # For spoken input, use LLM to evaluate
+            return await evaluate_task_with_llm(state_name, user_input)
         
         # Get options for the current state
         state = FLOW_STATES[state_name]
-        options = state.get("options")
         
-        # Use LLM to evaluate the task
-        result = await evaluate_task_with_llm(state_name, user_input, options)
+        # For identify_empowered_state, get the options based on the current challenge
+        if state_name == "identify_empowered_state" and flow_manager and flow_manager.state and "challenge" in flow_manager.state:
+            current_challenge = flow_manager.state["challenge"]
+            # Get the list of empowered states for this challenge
+            options = get_empowered_states_for_challenge(current_challenge)
+            logger.info(f"[Handler] Current challenge: {current_challenge}")
+            logger.info(f"[Handler] Available empowered states: {options}")
+            # Use LLM to evaluate the task with the empowered states
+            result = await evaluate_task_with_llm(state_name, user_input, options, flow_manager)
+        else:
+            # For other states, use the options directly
+            options = state.get("options")
+            logger.info(f"[Handler] Using default options: {options}")
+            # Use LLM to evaluate the task
+            result = await evaluate_task_with_llm(state_name, user_input, options, flow_manager)
+        
+        logger.info(f"[Handler] LLM result: {result}")
         
         if result["status"] == "success":
             if result.get("needs_confirmation"):
                 # We found a match but need confirmation
                 return {
                     "status": "success",
-                    "user_ready": False,
                     "result": result.get("result"),
                     "needs_confirmation": True
                 }
@@ -240,14 +345,12 @@ def create_handler_for_state(state_name: str):
                 # User confirmed the match
                 return {
                     "status": "success",
-                    "user_ready": True,
                     "result": result.get("result")
                 }
         else:
             # Need more information from the user
             return {
                 "status": "success",
-                "user_ready": False,
                 "needs_more_info": True
             }
     
@@ -264,18 +367,49 @@ def create_callback_for_state(state_name: str):
         if result.get("needs_confirmation"):
             # Store the result in the state before formatting the confirmation prompt
             if result.get("result"):
-                if state_name == "greeting":
-                    # For greeting state, store the name in the correct key
+                if state_name == "collect_name":
+                    # For collect_name state, store the name in the correct key
                     flow_manager.state["name"] = result["result"]
                 elif state_name == "identify_challenge":
                     # For identify_challenge state, store the challenge in the correct key
                     flow_manager.state["challenge"] = result["result"]
+                    # Get emotions from Hume if available
+                    if "emotion" in flow_manager.state:
+                        emotions = flow_manager.state["emotion"].get("prosody", {}).get("predictions", [{}])[0].get("emotions", [])
+                        if emotions:
+                            # Get only the top 2 emotions by score
+                            top_emotions = sorted(emotions, key=lambda x: x.get("score", 0), reverse=True)[:2]
+                            # Store emotions as an array of names
+                            flow_manager.state["challenge_emotions"] = [e.get("name", "") for e in top_emotions]
+                        else:
+                            flow_manager.state["challenge_emotions"] = ["determined", "focused"]
+                elif state_name == "identify_empowered_state":
+                    # For identify_empowered_state, store the state in the correct key
+                    flow_manager.state["empowered_state"] = result["result"]
+                    # Get emotions from Hume if available
+                    if "emotion" in flow_manager.state:
+                        emotions = flow_manager.state["emotion"].get("prosody", {}).get("predictions", [{}])[0].get("emotions", [])
+                        if emotions:
+                            # Get only the top 2 emotions by score
+                            top_emotions = sorted(emotions, key=lambda x: x.get("score", 0), reverse=True)[:2]
+                            # Store emotions as an array of names
+                            flow_manager.state["empowered_emotions"] = [e.get("name", "") for e in top_emotions]
+                        else:
+                            flow_manager.state["empowered_emotions"] = ["determined", "focused"]
                 else:
                     flow_manager.state[state_name] = result["result"]
             
             # We need to confirm the user's input
+            # For the confirmation prompt, join emotions into a string
+            if state_name == "identify_challenge":
+                if "challenge_emotions" in flow_manager.state and isinstance(flow_manager.state["challenge_emotions"], list):
+                    flow_manager.state["challenge_emotions"] = ", ".join(flow_manager.state["challenge_emotions"])
+            elif state_name == "identify_empowered_state":
+                if "empowered_emotions" in flow_manager.state and isinstance(flow_manager.state["empowered_emotions"], list):
+                    flow_manager.state["empowered_emotions"] = ", ".join(flow_manager.state["empowered_emotions"])
+            
             confirmation_prompt = state["confirmation_prompt"].format(**flow_manager.state)
-            await flow_manager.set_node(state_name, create_node_for_state(state_name, confirmation_prompt))
+            await flow_manager.set_node(state_name, create_node_for_state(state_name, confirmation_prompt, flow_manager))
             
             # Send state update to frontend
             logger.info(f"Sending state update with data: {flow_manager.state}")
@@ -286,13 +420,26 @@ def create_callback_for_state(state_name: str):
             return
             
         if result.get("needs_more_info"):
-            # We need more information from the user
-            if state_name == "greeting" and "name" in flow_manager.state:
-                # If we're in greeting and have a previous name attempt, use the retry prompt
-                await flow_manager.set_node(state_name, create_node_for_state(state_name, state["retry_prompt"]))
-            else:
-                # Otherwise use the standard prompt
-                await flow_manager.set_node(state_name, create_node_for_state(state_name))
+            # Instead of using fixed prompts, let the AI continue the conversation
+            # while maintaining focus on the current task
+            system_message = f"""You are Sphinx, a therapeutic guide with a specific task: {state['task']}. 
+            The user's response indicates we need more information, but we should continue the conversation naturally.
+            Your role is to:
+            1. Acknowledge what the user has shared
+            2. Gently guide them back to the task at hand
+            3. Rephrase the question or prompt in a way that might help them express themselves
+            4. Maintain a supportive and understanding tone
+            
+            Current task: {state['task']}
+            Available options: {state.get('options', 'N/A')}
+            
+            Respond in a way that:
+            - Shows you're listening and understanding
+            - Helps the user feel comfortable sharing more
+            - Keeps the conversation focused on the task
+            """
+            
+            await flow_manager.set_node(state_name, create_node_for_state(state_name, system_message, flow_manager))
             return
             
         if result["status"] == "success" and result.get("result"):
@@ -301,7 +448,7 @@ def create_callback_for_state(state_name: str):
                 # Move to the next state if available
                 next_state = state.get("next_state")
                 if next_state:
-                    await flow_manager.set_node(next_state, create_node_for_state(next_state))
+                    await flow_manager.set_node(next_state, create_node_for_state(next_state, None, flow_manager))
                     # Send state update to frontend with the new state
                     logger.info(f"Sending state update with data: {flow_manager.state}")
                     await status_updater.update_status(
@@ -310,7 +457,7 @@ def create_callback_for_state(state_name: str):
                     )
                 else:
                     # We've reached the end of the flow
-                    await flow_manager.set_node(state_name, create_node_for_state(state_name))
+                    await flow_manager.set_node(state_name, create_node_for_state(state_name, None, flow_manager))
                     # Send final state update to frontend
                     logger.info(f"Sending state update with data: {flow_manager.state}")
                     await status_updater.update_status(
@@ -319,12 +466,22 @@ def create_callback_for_state(state_name: str):
                     )
             else:
                 # For new inputs, store the result
-                if state_name == "greeting":
-                    # For greeting state, store the name in the correct key
+                if state_name == "collect_name":
+                    # For collect_name state, store the name in the correct key
                     flow_manager.state["name"] = result["result"]
                 elif state_name == "identify_challenge":
                     # For identify_challenge state, store the challenge in the correct key
                     flow_manager.state["challenge"] = result["result"]
+                    # Get emotions from Hume if available
+                    if "emotion" in flow_manager.state:
+                        emotions = flow_manager.state["emotion"].get("prosody", {}).get("predictions", [{}])[0].get("emotions", [])
+                        if emotions:
+                            # Get only the top 2 emotions by score
+                            top_emotions = sorted(emotions, key=lambda x: x.get("score", 0), reverse=True)[:2]
+                            # Store emotions as an array of names
+                            flow_manager.state["challenge_emotions"] = [e.get("name", "") for e in top_emotions]
+                        else:
+                            flow_manager.state["challenge_emotions"] = ["determined", "focused"]
                 else:
                     flow_manager.state[state_name] = result["result"]
     
@@ -335,10 +492,7 @@ def get_next_state(current_state: str) -> str:
     flow_sequence = [
         "greeting",
         "identify_challenge",
-        "record_challenge_feeling",
-        "confirm_challenge_emotions",
-        "identify_envisioned_state",
-        "confirm_envisioned_emotions",
+        "identify_empowered_state",
         "goodbye"
     ]
     
@@ -347,7 +501,7 @@ def get_next_state(current_state: str) -> str:
         return flow_sequence[current_index + 1]
     return "goodbye"  # Default to goodbye if we're at the end
 
-def create_node_for_state(state_name: str, custom_prompt: str = None) -> NodeConfig:
+def create_node_for_state(state_name: str, custom_prompt: str = None, flow_manager: FlowManager = None) -> NodeConfig:
     """Create a node configuration for a given state in the flow."""
     state = FLOW_STATES[state_name]
     
@@ -356,9 +510,7 @@ def create_node_for_state(state_name: str, custom_prompt: str = None) -> NodeCon
     
     # Format the prompt with any available state variables
     try:
-        # Get the flow manager from the global scope if available
-        flow_manager = globals().get('flow_manager')
-        if flow_manager:
+        if flow_manager and flow_manager.state:
             prompt = prompt.format(**flow_manager.state)
     except (KeyError, AttributeError):
         # If we can't format the prompt, use it as is
@@ -379,6 +531,38 @@ def create_node_for_state(state_name: str, custom_prompt: str = None) -> NodeCon
     4. After each participant response, evaluate: Have I completed this task? If yes, confirm it. If no, continue listening and identifying
     5. Never deviate from this task or generate simulated responses"""
     
+    # Create UI override based on the state
+    ui_override = None
+    if state_name == "greeting":
+        ui_override = {
+            "type": "button",
+            "prompt": "Is participant ready?",
+            "action_text": "I am ready"
+        }
+    elif state_name == "collect_name":
+        ui_override = {
+            "type": "text_input",
+            "prompt": "Enter your name",
+            "placeholder": "Type your name here",
+            "submit_text": "Submit"
+        }
+    elif state_name == "identify_challenge":
+        ui_override = {
+            "type": "list",
+            "prompt": "Which challenge listed is most alive for you right now?",
+            "options": state["options"]
+        }
+    elif state_name == "identify_empowered_state":
+        # Get the appropriate options based on the current challenge
+        options = []
+        if flow_manager and flow_manager.state and "challenge" in flow_manager.state:
+            options = get_empowered_states_for_challenge(flow_manager.state["challenge"])
+        ui_override = {
+            "type": "list",
+            "prompt": "Select your envisioned empowered state",
+            "options": options
+        }
+    
     return {
         "role_messages": [
             {"role": "system", "content": system_message}
@@ -396,11 +580,7 @@ def create_node_for_state(state_name: str, custom_prompt: str = None) -> NodeCon
                 transition_callback=create_callback_for_state(state_name)
             )
         ],
-        "ui_override": {
-            "type": "button",
-            "prompt": "Is participant ready?",
-            "action_text": "I am ready"
-        }
+        "ui_override": ui_override
     }
 
 def create_selection_node(state_name: str) -> NodeConfig:
@@ -443,33 +623,9 @@ def create_selection_node(state_name: str) -> NodeConfig:
 def create_initial_node() -> NodeConfig:
     return create_node_for_state("greeting")
 
-# Create the consider challenge node
-def create_consider_challenge_node() -> NodeConfig:
-    return create_node_for_state("identify_challenge")
-
-# Create the confirm challenge node
-def create_confirm_challenge_node() -> NodeConfig:
-    return create_node_for_state("confirm_challenge")
-
-# Create the record challenge feeling node
-def create_record_challenge_feeling_node() -> NodeConfig:
-    return create_node_for_state("record_challenge_feeling")
-
-# Create the confirm challenge emotions node
-def create_confirm_challenge_emotions_node() -> NodeConfig:
-    return create_node_for_state("confirm_challenge_emotions")
-
-# Create the identify envisioned state node
-def create_identify_envisioned_state_node() -> NodeConfig:
-    return create_node_for_state("identify_envisioned_state")
-
-# Create the confirm envisioned state node
-def create_confirm_envisioned_state_node() -> NodeConfig:
-    return create_node_for_state("confirm_envisioned_state")
-
-# Create the confirm envisioned emotions node
-def create_confirm_envisioned_emotions_node() -> NodeConfig:
-    return create_node_for_state("confirm_envisioned_emotions")
+# Create the identify empowered state node
+def create_identify_empowered_state_node() -> NodeConfig:
+    return create_node_for_state("identify_empowered_state")
 
 # Create the goodbye node
 def create_goodbye_node() -> NodeConfig:

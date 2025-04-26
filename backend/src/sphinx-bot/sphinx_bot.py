@@ -198,7 +198,7 @@ async def run_bot(room_url, token, identifier, data=None):
         ),
     )
     
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4.5-preview")
+    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4.1")
     
     # Get device from environment variable, default to cuda
     sphinx_whisper_device = os.getenv("SPHINX_WHISPER_DEVICE", "cuda")
@@ -333,7 +333,17 @@ async def run_bot(room_url, token, identifier, data=None):
         """Handler for UI override response action"""
         message = arguments.get("message", "Default message")
         logger.info(f"UI override response triggered with message: {message}")
-        await processor.queue_frame(TranscriptionFrame(message, "", time_now_iso8601()), direction=FrameDirection.DOWNSTREAM)
+        
+        # Create a proper user transcription frame
+        await processor.queue_frame(
+            TranscriptionFrame(
+                text=message,
+                user_id="ui_override",  # Mark this as coming from UI override
+                timestamp=time_now_iso8601(),
+                final=True
+            ),
+            direction=FrameDirection.DOWNSTREAM
+        )
         return True
 
     uioverride_response_action = RTVIAction(

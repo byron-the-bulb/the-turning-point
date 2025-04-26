@@ -83,7 +83,8 @@ export default function Home() {
     name: null as string | null,
     challenge: null as string | null,
     envisionedState: null as string | null,
-    emotions: null as string[] | null
+    challenge_emotions: null as string[] | null,
+    empowered_emotions: null as string[] | null
   });
 
   // Custom setter to log all updates to pendingUIOverride
@@ -181,7 +182,10 @@ export default function Home() {
       console.log('Received transcription:', transcript);
       if (transcript.text) {
         addChatMessage(transcript.text, 'user');
-        setUIOverride(null);
+        // Only clear UI override if this is not a UI override action
+        if (transcript.user_id !== "ui_override") {
+          setUIOverride(null);
+        }
       }
     };
 
@@ -215,8 +219,13 @@ export default function Home() {
           ...prev,
           name: event.status_context.data.name || prev.name,
           challenge: event.status_context.data.challenge || prev.challenge,
-          envisionedState: event.status_context.data.envisioned_state || prev.envisionedState,
-          emotions: event.status_context.data.emotions || prev.emotions
+          envisionedState: event.status_context.data.empowered_state || prev.envisionedState,
+          challenge_emotions: Array.isArray(event.status_context.data.challenge_emotions) ? event.status_context.data.challenge_emotions : 
+                            typeof event.status_context.data.challenge_emotions === 'string' ? event.status_context.data.challenge_emotions.split(', ') : 
+                            prev.challenge_emotions,
+          empowered_emotions: Array.isArray(event.status_context.data.empowered_emotions) ? event.status_context.data.empowered_emotions : 
+                            typeof event.status_context.data.empowered_emotions === 'string' ? event.status_context.data.empowered_emotions.split(', ') : 
+                            prev.empowered_emotions
         }));
       }
       if (event) {
@@ -468,7 +477,8 @@ export default function Home() {
                 name={interviewData.name}
                 challenge={interviewData.challenge}
                 envisionedState={interviewData.envisionedState}
-                emotions={interviewData.emotions}
+                challenge_emotions={interviewData.challenge_emotions}
+                empowered_emotions={interviewData.empowered_emotions}
               />
             </div>
           </RTVIClientProvider>
@@ -484,7 +494,8 @@ export default function Home() {
               name={interviewData.name}
               challenge={interviewData.challenge}
               envisionedState={interviewData.envisionedState}
-              emotions={interviewData.emotions}
+              challenge_emotions={interviewData.challenge_emotions}
+              empowered_emotions={interviewData.empowered_emotions}
             />
           </div>
         )}

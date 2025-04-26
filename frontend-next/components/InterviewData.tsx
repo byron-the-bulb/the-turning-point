@@ -5,10 +5,17 @@ interface InterviewDataProps {
   name: string | null;
   challenge: string | null;
   envisionedState: string | null;
-  emotions: string[] | null;
+  challenge_emotions: string[] | null;
+  empowered_emotions: string[] | null;
 }
 
-const InterviewData: React.FC<InterviewDataProps> = ({ name, challenge, envisionedState, emotions }) => {
+const InterviewData: React.FC<InterviewDataProps> = ({ 
+  name, 
+  challenge, 
+  envisionedState, 
+  challenge_emotions,
+  empowered_emotions 
+}) => {
   return (
     <div className={styles.interviewData}>
       <h3>Interview Data</h3>
@@ -22,14 +29,26 @@ const InterviewData: React.FC<InterviewDataProps> = ({ name, challenge, envision
           <span className={styles.value}>{challenge || 'Not yet identified'}</span>
         </div>
         <div className={styles.dataItem}>
+          <span className={styles.label}>Challenge Emotions:</span>
+          <div className={styles.emotionsList}>
+            {challenge_emotions && challenge_emotions.length > 0 ? (
+              challenge_emotions.map((emotion, index) => (
+                <span key={index} className={styles.emotionTag}>{emotion}</span>
+              ))
+            ) : (
+              <span className={styles.placeholder}>No emotions recorded yet</span>
+            )}
+          </div>
+        </div>
+        <div className={styles.dataItem}>
           <span className={styles.label}>Envisioned State:</span>
           <span className={styles.value}>{envisionedState || 'Not yet envisioned'}</span>
         </div>
         <div className={styles.dataItem}>
-          <span className={styles.label}>Emotions:</span>
+          <span className={styles.label}>Empowered Emotions:</span>
           <div className={styles.emotionsList}>
-            {emotions && emotions.length > 0 ? (
-              emotions.map((emotion, index) => (
+            {empowered_emotions && empowered_emotions.length > 0 ? (
+              empowered_emotions.map((emotion, index) => (
                 <span key={index} className={styles.emotionTag}>{emotion}</span>
               ))
             ) : (
