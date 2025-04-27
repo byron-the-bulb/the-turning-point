@@ -29,7 +29,7 @@ from pipecat.transports.services.daily import DailyTransport, DailyParams
 from pipecat.services.whisper.stt import WhisperSTTService, Model
 from pipecat.processors.frameworks.rtvi import RTVIProcessor, RTVIConfig, RTVIObserver, RTVIMessage, RTVIAction, RTVIActionArgument,RTVIServerMessageFrame
 from pipecat_flows import FlowManager
-from sphinx_script_dynamic import create_initial_node
+from sphinx_script_dynamic import create_identify_empowered_state_node, create_initial_node
 from status_utils import status_updater
 from custom_flow_manager import CustomFlowManager
 from pipecat.processors.frame_processor import FrameDirection
@@ -135,10 +135,16 @@ async def run_bot(room_url, token, identifier, data=None):
         token=token,
         bot_name="Sphinx",
         params=DailyParams(
-            #audio_in_enabled=True,
+            audio_in_enabled=True,
             audio_out_enabled=True,
             vad_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=1.8)),
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(
+                threshold=0.3,              # Sensitive to short bursts
+                min_speech_duration_ms=100, # Captures brief utterances
+                min_silence_duration_ms=50, # Quick response to speech end
+                stop_secs=1.8,              # Tolerant of pauses in long speech
+                max_speech_duration_secs=30 # Allow long utterances                
+                )),
             vad_audio_passthrough=True,
             session_timeout=60 * 2,
         ),
@@ -199,7 +205,9 @@ async def run_bot(room_url, token, identifier, data=None):
         stt = WhisperSTTService(
             api_key=os.getenv("OPENAI_API_KEY"),
             device=sphinx_whisper_device,
-            model=Model.MEDIUM
+            model=Model.DISTIL_MEDIUM_EN,
+            no_speech_prob=0.2,
+            buffer_size_secs=0.5
         )
 
     tts = None
@@ -258,7 +266,7 @@ async def run_bot(room_url, token, identifier, data=None):
         params=PipelineParams(
             audio_in_sample_rate=16000,
             audio_out_sample_rate=48000,
-            allow_interruptions=False,
+            allow_interruptions=True,
         ),
         observers=[RTVIObserver(rtvi), hume_observer]
     )
@@ -358,7 +366,7 @@ async def run_bot(room_url, token, identifier, data=None):
 
     @hume_observer.event_handler("on_emotions_received")
     async def on_emotions_received(hume_observer, prosody_data):
-        logger.info(f"Prosody emotions received: {prosody_data}")
+        logger.info(f"Prosody emotions received")
         try:
             # Send emotions to client for displaying
             message = {
@@ -380,7 +388,7 @@ async def run_bot(room_url, token, identifier, data=None):
     
     @hume_observer.event_handler("on_language_emotions_received")
     async def on_language_emotions_received(hume_observer, language_data):
-        logger.info(f"Language emotions received: {language_data}")
+        logger.info(f"Language emotions received")
         try:
             # Send language emotions to client for displaying
             message = {
