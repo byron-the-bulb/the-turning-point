@@ -144,7 +144,7 @@ async def run_bot(room_url, token, identifier, data=None):
         ),
     )
     
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4.5-preview")
+    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4.1")
     
     # Get device from environment variable, default to cuda
     sphinx_whisper_device = os.getenv("SPHINX_WHISPER_DEVICE", "cuda")
