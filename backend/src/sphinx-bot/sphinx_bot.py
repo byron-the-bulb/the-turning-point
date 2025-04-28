@@ -41,6 +41,7 @@ import base64
 from pipecat.transports.services.helpers.daily_rest import DailyRESTHelper, DailyRoomParams
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from hume_offline_observer import HumeOfflineWebSocketObserver
+from pipecat.processors.filters.stt_mute_filter import STTMuteFilter, STTMuteConfig, STTMuteStrategy
 
 
 load_dotenv(override=True)
@@ -245,6 +246,12 @@ async def run_bot(room_url, token, identifier, data=None):
     context = OpenAILLMContext(messages)
     context_aggregator = llm.create_context_aggregator(context)
 
+    stt_mute_filter = STTMuteFilter(
+        config=STTMuteConfig(strategies={
+            STTMuteStrategy.ALWAYS
+        })
+    )
+
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
     await status_updater.initialize(rtvi, identifier, room_url)
     hume_observer = HumeOfflineWebSocketObserver(api_key=os.getenv("HUME_API_KEY"), rtvi=rtvi)
@@ -252,6 +259,7 @@ async def run_bot(room_url, token, identifier, data=None):
         [
             transport.input(),  # Websocket input from client
             rtvi,
+            stt_mute_filter,
             stt,  # Speech-To-Text
             context_aggregator.user(),
             llm,  # LLM
