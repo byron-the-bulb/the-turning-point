@@ -384,7 +384,7 @@ async def identify_empowered_state_callback(
     if result["empowered_state_raw"] and result["emotions_fully_processed"]:
         await flow_manager.set_node("confirm_empowered_state", create_confirm_empowered_state_node(
             emotions_summary=emotions_summary,
-            challenge="anxious"
+            challenge=challenge
             ))
     else:
         await flow_manager.set_node("identify_empowered_state", create_identify_empowered_state_node())
