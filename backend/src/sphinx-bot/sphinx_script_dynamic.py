@@ -11,10 +11,14 @@ SYSTEM_ROLE = """"You are Sphinx, a therapeutic guide helping users explore stuc
     Your responses should encourage embodied awareness and emotional resonance. 
     
     IMPORTANT: 
-    1. Your responses will be converted to audio, avoid special characters or text formatting that is not translatable
-    2. NEVER generate or simulate user inputs
-    3. ONLY evaluate real user inputs that are provided to you
-    4. Never deviate from the task at hand or generate simulated responses"""
+    1. Your responses will be converted to audio, avoid special characters or text formatting that is not translatable. Avoid hypens between sentences.
+    2. Do not repeat yourself, dont be too succint but dont be verbose either.
+    3. Insert a <break time="500ms"/> tag between sentences (after periods, exclamation points, or question marks followed by a space).
+    4. Ensure sentences are properly punctuated to mark sentence boundaries.
+    5. Do not use SSML tags other than <break> unless explicitly requested.
+    6. Produce natural, conversational text with clear sentence breaks.
+    7. Use two question marks to emphasize questions. For example, “Are you here??” vs. “Are you here?”
+    8. Never deviate from the task at hand or generate simulated responses"""
 
 CHALLENGE_TO_EMPOWERED_STATES = {
     "fearful": ["Confident", "Experimental and Risking", "Courageous", "Leadership"],
@@ -147,6 +151,9 @@ async def confirm_name_callback(
 
 def create_collect_name_node()->NodeConfig:
     return {
+        "role_messages": [
+            {"role": "system", "content": SYSTEM_ROLE},
+        ],
         "task_messages": [
             {"role": "system", "content": FLOW_STATES["collect_name"]["task"]},
         ],
@@ -196,6 +203,9 @@ async def select_challenge_callback(
 
 def create_select_challenge_node()->NodeConfig:
     return {
+        "role_messages": [
+            {"role": "system", "content": SYSTEM_ROLE},
+        ],
         "task_messages": [
             {"role": "system", "content": FLOW_STATES["select_challenge"]["task"]}
         ],
@@ -235,6 +245,9 @@ async def confirm_challenge_callback(
 
 def create_confirm_challenge_node()->NodeConfig:
     return {
+        "role_messages": [
+            {"role": "system", "content": SYSTEM_ROLE},
+        ],
         "task_messages": [
             {"role": "system", "content": FLOW_STATES["confirm_challenge"]["task"]}
         ],
@@ -293,6 +306,9 @@ async def record_challenge_in_depth_callback(
 
 def create_record_challenge_in_depth_node()->NodeConfig:
     return {
+        "role_messages": [
+            {"role": "system", "content": SYSTEM_ROLE},
+        ],
         "task_messages": [
             {"role": "system", "content": FLOW_STATES["explore_challenge"]["task"]}
         ],
@@ -337,6 +353,9 @@ async def confirm_emotions_callback(
 
 def create_confirm_emotions_node(emotions_summary: str, challenge: str)->NodeConfig:
     return {
+        "role_messages": [
+            {"role": "system", "content": SYSTEM_ROLE},
+        ],
         "task_messages": [
             {"role": "system", "content": f"Emotions Detected: {emotions_summary}. Confirm with the user the emotions detected while he was speaking about the challenge in depth. For example: 'It sounds like you’re feeling {emotions_summary} from experiencing {challenge}. Is that true?'"}
         ],
@@ -391,6 +410,9 @@ async def identify_empowered_state_callback(
 
 def create_identify_empowered_state_node()->NodeConfig:
     return {
+        "role_messages": [
+            {"role": "system", "content": SYSTEM_ROLE},
+        ],
         "task_messages": [
             {"role": "system", "content": FLOW_STATES["identify_empowered_state"]["task"]}
         ],
@@ -426,6 +448,9 @@ async def confirm_empowered_state_callback(
 
 def create_confirm_empowered_state_node(emotions_summary: str, challenge: str)->NodeConfig:
     return {
+        "role_messages": [
+            {"role": "system", "content": SYSTEM_ROLE},
+        ],
         "task_messages": [
             {"role": "system", "content": f"Emotions Detected: {emotions_summary}. \
                 Available Empowered States: {', '.join(CHALLENGE_TO_EMPOWERED_STATES[challenge])}. \
@@ -450,6 +475,9 @@ def create_confirm_empowered_state_node(emotions_summary: str, challenge: str)->
 
 def create_goodbye_node()->NodeConfig:
     return {
+        "role_messages": [
+            {"role": "system", "content": SYSTEM_ROLE},
+        ],
         "task_messages": [
             {"role": "system", "content": "Say goodbye using the user's name."}
         ],

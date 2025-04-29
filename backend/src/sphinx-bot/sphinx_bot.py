@@ -4,17 +4,30 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-import argparse
-import asyncio
-import os
 import sys
-from huggingface_hub import snapshot_download
+import os
+from loguru import logger
+from dotenv import load_dotenv
 
-# Import our custom CloudWatch logger
+# Load environment variables first
+load_dotenv(override=True)
+
+# Remove default logger
+logger.remove(0)
+
+# Add console logging
+logger.add(sys.stderr, level="DEBUG")
+
+# Import our custom CloudWatch logger and set it up
 from cloudwatch_logger import setup_cloudwatch_logging
 
-from dotenv import load_dotenv
-from loguru import logger
+# Setup CloudWatch logging using our separate module
+setup_cloudwatch_logging()
+
+# Now import everything else
+import argparse
+import asyncio
+from huggingface_hub import snapshot_download
 
 from pipecat.audio.vad.silero import SileroVADAnalyzer, VADParams
 from pipecat.pipeline.pipeline import Pipeline
@@ -42,19 +55,6 @@ from pipecat.transports.services.helpers.daily_rest import DailyRESTHelper, Dail
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from hume_offline_observer import HumeOfflineWebSocketObserver
 from pipecat.processors.filters.stt_mute_filter import STTMuteFilter, STTMuteConfig, STTMuteStrategy
-
-
-load_dotenv(override=True)
-
-# Remove default logger
-logger.remove(0)
-
-# Add console logging
-logger.add(sys.stderr, level="DEBUG")
-
-# Setup CloudWatch logging using our separate module
-setup_cloudwatch_logging()
-
 
 
 class SessionTimeoutHandler:
@@ -101,7 +101,6 @@ class SessionTimeoutHandler:
             logger.info("TTS completed and EndFrame pushed successfully.")
         except Exception as e:
             logger.error(f"Error during call termination: {e}")
-
 
 
 async def run_bot(room_url, token, identifier, data=None):
