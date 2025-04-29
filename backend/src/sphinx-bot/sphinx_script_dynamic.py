@@ -17,7 +17,7 @@ SYSTEM_ROLE = """"You are Sphinx, a therapeutic guide helping users explore stuc
     4. Ensure sentences are properly punctuated to mark sentence boundaries.
     5. Do not use SSML tags other than <break> unless explicitly requested.
     6. Produce natural, conversational text with clear sentence breaks.
-    7. Use two question marks to emphasize questions. For example, “Are you here??” vs. “Are you here?”
+    7. Use two question marks to emphasize questions. For example, "Are you here??" vs. "Are you here?"
     8. Never deviate from the task at hand or generate simulated responses"""
 
 CHALLENGE_TO_EMPOWERED_STATES = {
@@ -50,6 +50,31 @@ FLOW_STATES = {
     "collect_name": {
         "task": "Ask the user for their name and record it with the collect_name function, then ask for confirmation with the confirm_name function.",
         "suggested_language": "Before we get started, please tell me your name?",
+    },
+    "identify_challenge": {
+        "task": """Available Challenges: Fearful, Anxious, Stagnant, Ruminating, Disassociated, Numb, Unhealthy, Scarcity, Excluded, Lack of Control, Lack of Agency, Disembodied, Ungrounded, Obsessed, Silenced, Unheard, Lack of Purpose, Unmotivated, Shameful.
+        Prompt the participant to speak about what they find challenging at the moment,
+        evaluate their input and pick one of the the challenge states listed above that matches the participant state.
+        Analyze their response as a therapist would:
+           - Look for themes, emotions, and qualities they're describing
+           - Match their described qualities to one of the available challenge states
+           - Use the identify_challenge function to evaluate your pick
+           - If the participant doesn't mention any of the challenges, pick the most relevant one based on the conversation
+           - Only try once to identify the challenge, if you fail to do so using the identify_challenge function, move on to the next step""",
+        "options": [
+            "Fearful","Anxious",
+            "Stagnant","Ruminating",
+            "Disassociated","Numb",
+            "Unhealthy",
+            "Scarcity",
+            "Excluded",
+            "Lack of Control","Lack of Agency",
+            "Disembodied","Ungrounded",
+            "Obsessed",
+            "Silenced","Unheard",
+            "Lack of Purpose","Unmotivated",
+            "Shameful"
+        ]
     },
     "select_challenge": {
         "task": "Help the participant identify their current challenging state by picking from the list of options presented to them in a poster",
@@ -145,7 +170,7 @@ async def confirm_name_callback(
 ):
     logger.info(f"[Flow]confirm_name_callback: {result}")
     if result["confirmed"]:
-        await flow_manager.set_node("select_challenge", create_select_challenge_node())
+        await flow_manager.set_node("identify_challenge", create_identify_challenge_node())
     else:
         await flow_manager.set_node("collect_name", create_collect_name_node())
 
@@ -176,6 +201,48 @@ def create_collect_name_node()->NodeConfig:
         ]
     }
 
+########################################################################
+# Identify Challenge
+########################################################################
+async def identify_challenge_handler(args: FlowArgs) -> FlowResult:
+    challenge = args.get("challenge", "").lower()
+    logger.info(f"[Flow]identify_challenge_handler: {challenge}")
+    #Validate challenge by checking if challenge contains one of the following words
+    options = [word.lower() for word in FLOW_STATES["identify_challenge"]["options"]]
+    if not any(word in challenge for word in options):
+        return {"status": "error", "message": "Invalid challenge"}
+    return {"status": "success", "challenge": challenge}
+
+async def identify_challenge_callback(
+    args: FlowArgs,
+    result: FlowResult,
+    flow_manager: FlowManager
+):
+    logger.info(f"[Flow]identify_challenge_callback {result}")
+    if result["status"] == "success":
+        await flow_manager.set_node("confirm_challenge", create_confirm_challenge_node())
+    else:
+        await flow_manager.set_node("select_challenge", create_select_challenge_node())
+
+def create_identify_challenge_node()->NodeConfig:
+    return {
+        "role_messages": [
+            {"role": "system", "content": SYSTEM_ROLE},
+        ],
+        "task_messages": [
+            {"role": "system", "content": FLOW_STATES["identify_challenge"]["task"]}
+        ],
+        "functions": [
+            FlowsFunctionSchema(
+                name="identify_challenge",
+                description="Identify the challenge the user is facing",
+                properties={"challenge": {"type": "string", "description": "The challenge the user is facing"}},
+                required=["challenge"],
+                handler=identify_challenge_handler,
+                transition_callback=identify_challenge_callback
+            )
+        ]
+    }
 
 ########################################################################
 # Select Challenge
@@ -357,7 +424,7 @@ def create_confirm_emotions_node(emotions_summary: str, challenge: str)->NodeCon
             {"role": "system", "content": SYSTEM_ROLE},
         ],
         "task_messages": [
-            {"role": "system", "content": f"Emotions Detected: {emotions_summary}. Confirm with the user the emotions detected while he was speaking about the challenge in depth. For example: 'It sounds like you’re feeling {emotions_summary} from experiencing {challenge}. Is that true?'"}
+            {"role": "system", "content": f"Emotions Detected: {emotions_summary}. Confirm with the user the emotions detected while he was speaking about the challenge in depth. For example: 'It sounds like you're feeling {emotions_summary} from experiencing {challenge}. Is that true?'"}
         ],
         "functions": [
             FlowsFunctionSchema(
