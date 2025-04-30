@@ -3,10 +3,15 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  background-color: rgba(241, 237, 233, 0.7);
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
 }
 
 .voiceSelector label {
   font-weight: bold;
+  background-color: rgba(241, 237, 233, 0.7);
   min-width: 100px;
 }
 
@@ -15,7 +20,7 @@
   border-radius: 4px;
   border: 1px solid #ccc;
   min-width: 250px;
-  background-color: white;
+  background-color: rgba(241, 237, 233, 0.7);
 }
 
 .loading {
