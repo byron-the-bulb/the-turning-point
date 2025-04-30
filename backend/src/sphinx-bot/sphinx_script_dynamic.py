@@ -17,7 +17,7 @@ SYSTEM_ROLE = """"You are Sphinx, a therapeutic guide helping users explore stuc
     4. Ensure sentences are properly punctuated to mark sentence boundaries.
     5. Do not use SSML tags other than <break> unless explicitly requested.
     6. Produce natural, conversational text with clear sentence breaks.
-    7. Use two question marks to emphasize questions. For example, “Are you here??” vs. “Are you here?”
+    7. Use two question marks to emphasize questions. For example, "Are you here??" vs. "Are you here?"
     8. Never deviate from the task at hand or generate simulated responses"""
 
 CHALLENGE_TO_EMPOWERED_STATES = {
@@ -44,12 +44,46 @@ CHALLENGE_TO_EMPOWERED_STATES = {
 
 FLOW_STATES = {
     "greeting": {
-        "task": "Welcome the participant with a guided meditation, and wait for them to indicate readiness. When the user indicates readiness, call the check_for_ready function.",
+        "task": """Welcome the participant with a guided meditation, and wait for them to indicate readiness. 
+        
+        IMPORTANT RULES:
+        1. You have EXACTLY 2 attempts to understand if the participant is ready.
+        2. After 2 failed attempts (where they don't clearly say they are ready), you MUST call the guide_greeting_assistance function.
+        3. If the participant explicitly asks for help, call the guide_greeting_assistance function immediately.
+        4. If the participant speaks about anything else, reply gently but keep returning to the task at hand.
+        5. Until the participant indicates readiness with words like "ready", "yes", etc., do not proceed further.
+        6. DO NOT make a third attempt - after 2 attempts, ALWAYS call for guide assistance.""",
         "suggested_language": "Welcome Seeker. To begin your quest, we invite you to ground and center with a few deep breaths. Know that you are safe here in your center. You're doing great! When you are ready to begin, please say 'I am ready'.",
     },
     "collect_name": {
-        "task": "Ask the user for their name and record it with the collect_name function, then ask for confirmation with the confirm_name function.",
+        "task": "Ask the user for their name and record it with the collect_name function, then ask for confirmation with the confirm_name function. If the user does not share a name, gently keep returning to the task of getting their name. Do not go deeper into the conversation before moving on from this stage. If they dont share a name after 2 attempt, please call the guide_assistance function.",
         "suggested_language": "Before we get started, please tell me your name?",
+    },
+    "identify_challenge": {
+        "task": """Available Challenges: Fearful, Anxious, Stagnant, Ruminating, Disassociated, Numb, Unhealthy, Scarcity, Excluded, Lack of Control, Lack of Agency, Disembodied, Ungrounded, Obsessed, Silenced, Unheard, Lack of Purpose, Unmotivated, Shameful.
+        Prompt the participant to speak about what they find challenging at the moment,
+        evaluate their input and pick one of the the challenge states listed above that matches the participant state.
+        Analyze their response as a therapist would:
+           - Look for themes, emotions, and qualities they're describing
+           - Match their described qualities to one of the available challenge states
+           - Use the identify_challenge function to evaluate your pick
+           - If the participant doesn't mention any of the challenges, pick the most relevant one based on the conversation
+           - You have EXACTLY 2 attempts to match their response to one of the available challenges. After 2 attempts, you MUST use the select_challenge function to direct them to look at the poster of challenges.
+           - IMPORTANT: Do not make a third attempt at conversation. After 2 failed attempts, you MUST use the select_challenge function.""",
+        "options": [
+            "Fearful","Anxious",
+            "Stagnant","Ruminating",
+            "Disassociated","Numb",
+            "Unhealthy",
+            "Scarcity",
+            "Excluded",
+            "Lack of Control","Lack of Agency",
+            "Disembodied","Ungrounded",
+            "Obsessed",
+            "Silenced","Unheard",
+            "Lack of Purpose","Unmotivated",
+            "Shameful"
+        ]
     },
     "select_challenge": {
         "task": "Help the participant identify their current challenging state by picking from the list of options presented to them in a poster",
@@ -85,11 +119,17 @@ FLOW_STATES = {
         "task": "Conclude the session and prepare for video experience",
         "options": None,
         "suggested_language": "Thank you for sharing and taking the time to explore your inner landscape! Now please let your guide know you are ready to view your destiny.",
-    }
+    },
 }
+   
 
-async def greeting_ready_handler(args: FlowArgs) -> FlowResult:
-    return {"status": "success"}
+async def greeting_ready_handler(args: FlowArgs, flow_manager: FlowManager) -> FlowResult:
+    user_ready = args.get("user_ready", "").lower()
+    logger.info(f"[Flow]greeting_ready_handler: user_ready={user_ready}")
+    
+    if "ready" in user_ready:
+        return {"status": "success"}
+
 
 async def greeting_callback(
     args: FlowArgs,
@@ -97,7 +137,11 @@ async def greeting_callback(
     flow_manager: FlowManager
 ):
     logger.info(f"[Flow]greeting_callback: {result}")
-    await flow_manager.set_node("collect_name", create_collect_name_node())
+    if result["status"] == "success":
+        await flow_manager.set_node("collect_name", create_collect_name_node())
+    else:
+        await flow_manager.set_node("greeting", create_initial_node())
+
 
 def create_initial_node()->NodeConfig:
     return {
@@ -111,10 +155,20 @@ def create_initial_node()->NodeConfig:
             FlowsFunctionSchema(
                 name="check_for_ready",
                 description="Call this when the user is ready to proceed.",
-                properties={},
-                required=[],
+                properties={
+                    "user_ready": {"type": "string", "description": "User's response indicating readiness"}
+                },
+                required=["user_ready"],
                 handler=greeting_ready_handler,
                 transition_callback=greeting_callback
+            ),
+            FlowsFunctionSchema(
+                name="guide_greeting_assistance",
+                description="Call this when the user is not ready to proceed after 2 failed attempts or if the user indicates need for assistance.",
+                properties={},
+                required=[],
+                handler=guide_greeting_assistance_handler,
+                transition_callback=guide_greeting_assistance_callback
             )
         ],
         "ui_override": {
@@ -129,11 +183,39 @@ def create_initial_node()->NodeConfig:
 # Collect Name
 ########################################################################
 
-async def collect_name_handler(args : FlowArgs) -> FlowResult:
-    user_name = args["user_name"]
-    logger.info(f"[Flow]collect_name_handler: {user_name}")
-    # This will be sent back to the client in a TranscriptionFrame
-    return {"status": "success", "user_name": user_name}
+async def collect_name_handler(args: FlowArgs, flow_manager: FlowManager) -> FlowResult:
+    user_name = args.get("user_name", "").strip()
+    retry_count = flow_manager.state.get("name_retry_count", 0)
+    
+    # Basic validation - name should be at least 2 characters and not contain numbers
+    if len(user_name) >= 2 and not any(c.isdigit() for c in user_name):
+        flow_manager.state["name_retry_count"] = 0
+        return {"status": "success", "user_name": user_name}
+    elif retry_count < 1:
+        # First retry
+        flow_manager.state["name_retry_count"] = 1
+        return {"status": "retry"}
+    else:
+        # Second failure - need guide assistance
+        flow_manager.state["name_retry_count"] = 0  # Reset for next time
+        return {"status": "guide_needed"}
+
+async def collect_name_callback(
+    args: FlowArgs,
+    result: FlowResult,
+    flow_manager: FlowManager
+):
+    logger.info(f"[Flow]collect_name_callback: {result}")
+    if result["status"] == "success":
+        await flow_manager.set_node("confirm_name", create_collect_name_node(
+            f"Great! I heard your name is {result['user_name']}. Is that correct?"
+        ))
+    elif result["status"] == "retry":
+        await flow_manager.set_node("collect_name", create_collect_name_node(
+            "I didn't quite catch that. Could you please tell me your name again? Or would you prefer to be called Seeker?"
+        ))
+    else:
+        await flow_manager.set_node("guide_assistance", create_name_guide_assistance_node())
 
 async def confirm_name_handler(args : FlowArgs) -> FlowResult:
     confirmed = args["confirmed"]
@@ -147,25 +229,32 @@ async def confirm_name_callback(
 ):
     logger.info(f"[Flow]confirm_name_callback: {result}")
     if result["confirmed"]:
-        await flow_manager.set_node("select_challenge", create_select_challenge_node())
+        # Store the confirmed name in the flow state
+        flow_manager.state["user_name"] = args.get("user_name", "Seeker")
+        # Transition to the challenge identification stage
+        await flow_manager.set_node("identify_challenge", create_identify_challenge_node())
     else:
+        # If name is not confirmed, go back to name collection
         await flow_manager.set_node("collect_name", create_collect_name_node())
 
-def create_collect_name_node()->NodeConfig:
+def create_collect_name_node(custom_prompt: str = None)->NodeConfig:
     return {
         "role_messages": [
             {"role": "system", "content": SYSTEM_ROLE},
         ],
         "task_messages": [
-            {"role": "system", "content": FLOW_STATES["collect_name"]["task"]},
+            {"role": "system", "content": f"{custom_prompt or FLOW_STATES['collect_name']['task']}. IMPORTANT: Only call the name_guide_assistance function if: 1) The participant explicitly asks for help from a guide, or 2) You have made two attempts to collect their name and still cannot get a valid name."}
         ],
         "functions": [
             FlowsFunctionSchema(
                 name="collect_name",
-                description="Record the user's name.",
-                properties={"user_name": {"type": "string", "description": "The user's name"}},
+                description="Collect the user's name",
+                properties={
+                    "user_name": {"type": "string", "description": "The user's name"},
+                },
                 required=["user_name"],
                 handler=collect_name_handler,
+                transition_callback=collect_name_callback
             ),
             FlowsFunctionSchema(
                 name="confirm_name",
@@ -174,16 +263,91 @@ def create_collect_name_node()->NodeConfig:
                 required=["confirmed"],
                 handler=confirm_name_handler,
                 transition_callback=confirm_name_callback
+            ),
+            FlowsFunctionSchema(
+                name="name_guide_assistance",
+                description="Call this when the user is having trouble providing their name after 1 attempt or if they ask for help.",
+                properties={},
+                required=[],
+                handler=call_name_guide_assistance,
+                transition_callback=call_name_guide_assistance_callback
+            )
+        ],
+        "ui_override": {
+            "type": "text_input",
+            "prompt": "Enter your name",
+            "placeholder": "Type your name here"
+        }
+    }
+
+########################################################################
+# Identify Challenge
+########################################################################
+async def identify_challenge_handler(args: FlowArgs) -> FlowResult:
+    challenge = args.get("challenge", "").lower()
+    logger.info(f"[Flow]identify_challenge_handler: {challenge}")
+    #Validate challenge by checking if challenge contains one of the following words
+    options = [word.lower() for word in FLOW_STATES["identify_challenge"]["options"]]
+    if not any(word in challenge for word in options):
+        return {"status": "error", "message": "Invalid challenge"}
+    return {"status": "success", "challenge": challenge}
+
+async def identify_challenge_callback(
+    args: FlowArgs,
+    result: FlowResult,
+    flow_manager: FlowManager
+):
+    logger.info(f"[Flow]identify_challenge_callback {result}")
+    if result["status"] == "success":
+        await flow_manager.set_node("confirm_challenge", create_confirm_challenge_node(flow_manager))
+    else:
+        # If the challenge is invalid, move to select_challenge stage
+        await flow_manager.set_node("select_challenge", create_select_challenge_node())
+
+async def move_to_select_challenge_handler(args: FlowArgs) -> FlowResult:
+    return {"status": "success", "move_to_select": True}
+
+async def move_to_select_challenge_callback(
+    args: FlowArgs,
+    result: FlowResult,
+    flow_manager: FlowManager
+):
+    logger.info(f"[Flow]move_to_select_challenge_callback {result}")
+    await flow_manager.set_node("select_challenge", create_select_challenge_node())
+
+def create_identify_challenge_node()->NodeConfig:
+    return {
+        "role_messages": [
+            {"role": "system", "content": SYSTEM_ROLE},
+        ],
+        "task_messages": [
+            {"role": "system", "content": FLOW_STATES["identify_challenge"]["task"]}
+        ],
+        "functions": [
+            FlowsFunctionSchema(
+                name="identify_challenge",
+                description="Identify the challenge the user is facing",
+                properties={"challenge": {"type": "string", "description": "The challenge the user is facing"}},
+                required=["challenge"],
+                handler=identify_challenge_handler,
+                transition_callback=identify_challenge_callback
+            ),
+            FlowsFunctionSchema(
+                name="move_to_select_challenge",
+                description="Call this when you cannot determine the challenge after 2 attempts. This will move to the select_challenge stage where the user can choose from the poster.",
+                properties={},
+                required=[],
+                handler=move_to_select_challenge_handler,
+                transition_callback=move_to_select_challenge_callback
             )
         ]
     }
-
 
 ########################################################################
 # Select Challenge
 ########################################################################
 
-async def select_challenge_handler(args : FlowArgs) -> FlowResult:
+async def select_challenge_handler(args: FlowArgs) -> FlowResult:
     challenge = args.get("challenge", "").lower()
     logger.info(f"[Flow]select_challenge_handler: {challenge}")
     #Validate challenge by checking if challenge contains one of the following words
@@ -199,9 +363,9 @@ async def select_challenge_callback(
 ):
     logger.info(f"[Flow]select_challenge_callback {result}")
     if result["status"] == "success":
-        await flow_manager.set_node("confirm_challenge", create_confirm_challenge_node())
+        await flow_manager.set_node("confirm_challenge", create_confirm_challenge_node(flow_manager))
     else:
-        await flow_manager.set_node("select_challenge", create_select_challenge_node())
+        await flow_manager.set_node("guide_assistance", create_challenge_guide_assistance_node())
 
 def create_select_challenge_node()->NodeConfig:
     return {
@@ -209,7 +373,12 @@ def create_select_challenge_node()->NodeConfig:
             {"role": "system", "content": SYSTEM_ROLE},
         ],
         "task_messages": [
-            {"role": "system", "content": FLOW_STATES["select_challenge"]["task"]}
+            {"role": "system", "content": f"""Follow this process in order:
+You couldnt determine the challenge from the conversation, so direct them to look at the poster of challenges and ask them to tell you which one resonates with them.
+If they they still have trouble selecting a challenge from the list of challenges (you dont need to name them) after looking at the poster, call the challenge_guide_assistance function.
+
+
+Available Challenges: {', '.join(FLOW_STATES['select_challenge']['options'])}"""}
         ],
         "functions": [
             FlowsFunctionSchema(
@@ -219,14 +388,23 @@ def create_select_challenge_node()->NodeConfig:
                 required=["challenge"],
                 handler=select_challenge_handler,
                 transition_callback=select_challenge_callback
+            ),
+            FlowsFunctionSchema(
+                name="challenge_guide_assistance",
+                description="Call this only if the user has trouble selecting a challenge even after looking at the poster.",
+                properties={},
+                required=[],
+                handler=call_challenge_guide_assistance,
+                transition_callback=call_challenge_guide_assistance_callback
             )
         ],
         "ui_override": {
             "type": "list",
             "prompt": "Which challenge listed is most alive for you right now?",
             "options": FLOW_STATES["select_challenge"]["options"]
-        },
-    }   
+        }
+    }
+
 ########################################################################
 # Confirm Challenge
 ########################################################################
@@ -241,139 +419,40 @@ async def confirm_challenge_callback(
 ):
     logger.info(f"[Flow]confirm_challenge_callback {result}")
     if result["status"] == "success":
-        await flow_manager.set_node("explore_challenge", create_record_challenge_in_depth_node())
+        await flow_manager.set_node("identify_empowered_state", create_identify_empowered_state_node(flow_manager))
     else:
         await flow_manager.set_node("select_challenge", create_select_challenge_node())
 
-def create_confirm_challenge_node()->NodeConfig:
-    return {
-        "role_messages": [
-            {"role": "system", "content": SYSTEM_ROLE},
-        ],
-        "task_messages": [
-            {"role": "system", "content": FLOW_STATES["confirm_challenge"]["task"]}
-        ],
-        "functions": [
-            FlowsFunctionSchema(
-                    name="confirm_challenge",
-                    description="Call this after the user confirms the challenge.",
-                    properties={},
-                    required=[],
-                    handler=confirm_challenge_handler,
-                    transition_callback=confirm_challenge_callback,
-                )
-            ],
-        "ui_override": {
-            "type": "list",
-            "prompt": "Is participant confirming?",
-            "options": ["Yes", "No"]
-        }
-    }
-
-########################################################################
-# Record Challenge In Depth
-########################################################################
-
-async def record_challenge_in_depth_handler(args : FlowArgs, flow_manager: FlowManager) -> FlowResult:
-    user_challenge_in_depth = args.get("user_challenge_in_depth", "").lower()
-    #user_done = args.get("user_done", False)
-    logger.info("Waiting for emotions to be processed")
-    #wait up to 60 seconds
-    for _ in range(120):
-        if flow_manager.state.get("emotions_fully_processed", False):
-            break
-        await asyncio.sleep(0.5)
-
-    logger.info("Emotions processed, moving to confirm_emotions")
-    logger.info(f"[Flow]record_challenge_in_depth_handler {user_challenge_in_depth}")
-    return {"status": "success", "user_challenge_in_depth": user_challenge_in_depth, "emotions_fully_processed": True}
-
-async def record_challenge_in_depth_callback(
-    args: FlowArgs,
-    result: FlowResult,
-    flow_manager: FlowManager
-):
-    logger.info(f"[Flow]record_challenge_in_depth_callback {result}")
+def create_confirm_challenge_node(flow_manager: FlowManager) -> NodeConfig:
     emotions_summary = flow_manager.state.get("emotions_summary", "")
     challenge = flow_manager.state.get("challenge", "")
-
-    logger.info(f"[Flow]record_challenge_in_depth_callback {emotions_summary}, {challenge}")
-    if result["emotions_fully_processed"]:
-        await flow_manager.set_node("confirm_emotions", create_confirm_emotions_node(
-            emotions_summary=emotions_summary,
-            challenge=challenge))
-    else:
-        await flow_manager.set_node("explore_challenge", create_record_challenge_in_depth_node())
-
-
-def create_record_challenge_in_depth_node()->NodeConfig:
     return {
         "role_messages": [
             {"role": "system", "content": SYSTEM_ROLE},
         ],
         "task_messages": [
-            {"role": "system", "content": FLOW_STATES["explore_challenge"]["task"]}
+            {"role": "system", "content": f"""IMPORTANT: This is ONLY a simple confirmation step. 
+
+Task: Ask the user to confirm if '{challenge}' is their challenge and if the emotions detected ({emotions_summary}) resonate with them. Use phrasing similar to:
+"It sounds like you are dealing with {challenge} and it makes you feel {emotions_summary}. Is that correct?"
+
+Do NOT explore these emotions or the challenge further.
+Do NOT ask additional follow-up questions about how these manifest.
+ONLY ask for confirmation and wait for their yes/no response."""}
         ],
         "functions": [
             FlowsFunctionSchema(
-                name="record_challenge_in_depth",
-                description="Record the user's challenge in depth and wait for the system to process the user's emotions.",
-                properties={"user_challenge_in_depth": {"type": "string", "description": "The user's own description of their challenge in depth"},
-                            "emotions_fully_processed": {"type": "boolean", "description": "Has the system processed the user's emotions?"}},
-                required=["user_challenge_in_depth", "emotions_fully_processed"],
-                handler=record_challenge_in_depth_handler,
-                transition_callback=record_challenge_in_depth_callback
-            )
-        ]#,
-        #"ui_override": {
-        #    "type": "button",
-        #    "prompt": "Is participant done?",
-        #    "action_text": "I am done"
-        #}
-    }
-
-
-########################################################################
-# Confirm Emotions
-########################################################################
-
-async def confirm_emotions_handler(args: FlowArgs) -> FlowResult:
-    user_input = args.get("user_input", "").lower()
-    is_confirmed = any(word in user_input for word in ["yes", "true", "correct", "absolutely", "yeah"])
-    return {"status": "success", "emotions_confirmed": is_confirmed}
-
-async def confirm_emotions_callback(
-    args: FlowArgs,
-    result: FlowResult,
-    flow_manager: FlowManager
-):
-    if result.get("emotions_confirmed"):
-        await flow_manager.set_node("identify_empowered_state", create_identify_empowered_state_node())
-    else:
-        await flow_manager.set_node("explore_challenge", create_record_challenge_in_depth_node())
-
-
-def create_confirm_emotions_node(emotions_summary: str, challenge: str)->NodeConfig:
-    return {
-        "role_messages": [
-            {"role": "system", "content": SYSTEM_ROLE},
-        ],
-        "task_messages": [
-            {"role": "system", "content": f"Emotions Detected: {emotions_summary}. Confirm with the user the emotions detected while he was speaking about the challenge in depth. For example: 'It sounds like you’re feeling {emotions_summary} from experiencing {challenge}. Is that true?'"}
-        ],
-        "functions": [
-            FlowsFunctionSchema(
-                name="confirm_emotions",
-                description="Record the user's confirmation of detected emotions",
-                properties={"user_input": {"type": "string", "description": "User response confirming the emotions"}},
-                required=["user_input"],
-                handler=confirm_emotions_handler,
-                transition_callback=confirm_emotions_callback
+                name="confirm_challenge",
+                description="Call this after the user confirms the challenge and emotions, without further exploration.",
+                properties={},
+                required=[],
+                handler=confirm_challenge_handler,
+                transition_callback=confirm_challenge_callback
             )
         ],
         "ui_override": {
             "type": "list",
-            "prompt": "Are these emotions accurate?",
+            "prompt": "Is this accurate?",
             "options": ["Yes", "No"]
         }
     }
@@ -385,7 +464,7 @@ def create_confirm_emotions_node(emotions_summary: str, challenge: str)->NodeCon
 async def identify_empowered_state_handler(args: FlowArgs, flow_manager: FlowManager) -> FlowResult:
     empowered_state_raw = args.get("empowered_state_raw", "").lower()
     challenge = args.get("challenge", "").lower()
-    logger.info("Waiting for emotions to be processed")
+    logger.info(f"[Flow]identify_empowered_state_handler: {empowered_state_raw}")
     #wait up to 60 seconds
     for _ in range(120):
         if flow_manager.state.get("emotions_fully_processed", False):
@@ -407,18 +486,31 @@ async def identify_empowered_state_callback(
         await flow_manager.set_node("confirm_empowered_state", create_confirm_empowered_state_node(
             emotions_summary=emotions_summary,
             challenge=challenge
-            ))
+        ))
     else:
-        logger.info(f"[Flow]identify_empowered_state_callback : going back identify_empowered_state")
-        await flow_manager.set_node("identify_empowered_state", create_identify_empowered_state_node())
+        await flow_manager.set_node("identify_empowered_state", create_identify_empowered_state_node(flow_manager))
 
-def create_identify_empowered_state_node()->NodeConfig:
+def create_identify_empowered_state_node(flow_manager: FlowManager=None)->NodeConfig:
+    challenge = ""
+    if flow_manager:
+        challenge = flow_manager.state.get('challenge', '')
+    
     return {
         "role_messages": [
             {"role": "system", "content": SYSTEM_ROLE},
         ],
         "task_messages": [
-            {"role": "system", "content": FLOW_STATES["identify_empowered_state"]["task"]}
+            {"role": "system", "content": f"""Follow this process in order:
+1. First, ask the participant about their desired empowered state and try to understand it through conversation. You have EXACTLY 2 attempts to match their response to one of the available empowered states. After 2 attempts, you MUST move to step 2.
+2. If after 2 attempts you still cannot match their response to an empowered state, direct them to look at the poster of empowered states and ask them to tell you which one resonates with them.
+3. Only if they still have trouble selecting an empowered state after looking at the poster, call the empowered_state_guide_assistance function.
+
+IMPORTANT: 
+- You MUST move to step 2 after exactly 2 attempts, regardless of the participant's response.
+- Do not make a third attempt at conversation.
+- If the participant's response doesn't match any empowered state after 2 attempts, move to the poster stage.
+
+Available Empowered States for your challenge: {', '.join(CHALLENGE_TO_EMPOWERED_STATES[challenge] if challenge else ["None specified"])}"""}
         ],
         "functions": [
             FlowsFunctionSchema(
@@ -429,6 +521,14 @@ def create_identify_empowered_state_node()->NodeConfig:
                 required=["empowered_state_raw", "challenge"],
                 handler=identify_empowered_state_handler,
                 transition_callback=identify_empowered_state_callback
+            ),
+            FlowsFunctionSchema(
+                name="empowered_state_guide_assistance",
+                description="Call this only if the user has trouble selecting an empowered state even after looking at the poster.",
+                properties={},
+                required=[],
+                handler=call_empowered_state_guide_assistance,
+                transition_callback=call_empowered_state_guide_assistance_callback
             )
         ]
     }
@@ -448,7 +548,7 @@ async def confirm_empowered_state_callback(
     if result.get("empowered_state_confirmed"):
         await flow_manager.set_node("goodbye", create_goodbye_node())
     else:
-        await flow_manager.set_node("identify_empowered_state", create_identify_empowered_state_node())
+        await flow_manager.set_node("identify_empowered_state", create_identify_empowered_state_node(flow_manager))
 
 def create_confirm_empowered_state_node(emotions_summary: str, challenge: str)->NodeConfig:
     return {
@@ -459,18 +559,23 @@ def create_confirm_empowered_state_node(emotions_summary: str, challenge: str)->
             {"role": "system", "content": f"Emotions Detected: {emotions_summary}. \
                 Available Empowered States: {', '.join(CHALLENGE_TO_EMPOWERED_STATES[challenge])}. \
                 Using his previous answer text and the emotions detected above pick the correct Empowered State. \
-                Then confirm the emotions and the empowered state you selected with the user. Call confirm_empowered_state function after the user confirms your selection."}
+                Then confirm the emotions and the empowered state you selected with the user. For example: 'It sounds like you will feel {emotions_summary} as you move toward {empowered_state}. Is that correct?'"}
         ],
         "functions": [
             FlowsFunctionSchema(
                 name="confirm_empowered_state",
-                description="Record the user's confirmation of detected emotions",
-                properties={"user_input": {"type": "string", "description": "User response confirming the emotions"}},
+                description="Record the user's confirmation of the empowered state and emotions",
+                properties={"user_input": {"type": "string", "description": "User response confirming the empowered state and emotions"}},
                 required=["user_input"],
                 handler=confirm_empowered_state_handler,
                 transition_callback=confirm_empowered_state_callback
             )
-        ]
+        ],
+        "ui_override": {
+            "type": "list",
+            "prompt": "Is this accurate?",
+            "options": ["Yes", "No"]
+        }
     }
 
 ########################################################################
@@ -494,6 +599,276 @@ def create_goodbye_node()->NodeConfig:
     }
 
 
+
+########################################################################
+# Guide Assistance
+########################################################################
+
+
+
+async def call_greeting_guide_assistance(args: FlowArgs) -> FlowResult:
+    return {"status": "success", "call_guide_assistance": True}
+
+async def call_greeting_guide_assistance_callback(
+    args: FlowArgs,
+    result: FlowResult,
+    flow_manager: FlowManager
+):
+    logger.info(f"[Flow]call_guide_assistance_callback: {result}")
+    if result["status"] == "success":
+        await flow_manager.set_node("guide_assistance", create_greeting_guide_assistance_node())
+
+async def call_name_guide_assistance(args: FlowArgs) -> FlowResult:
+    return {"status": "success", "call_guide_assistance": True}
+
+async def call_name_guide_assistance_callback(
+    args: FlowArgs,
+    result: FlowResult,
+    flow_manager: FlowManager
+):
+    logger.info(f"[Flow]call_name_guide_assistance_callback: {result}")
+    if result["status"] == "success":
+        await flow_manager.set_node("name_guide_assistance", create_name_guide_assistance_node())
+
+async def call_challenge_guide_assistance(args: FlowArgs) -> FlowResult:
+    return {"status": "success", "call_guide_assistance": True}
+
+async def call_challenge_guide_assistance_callback(
+    args: FlowArgs,
+    result: FlowResult,
+    flow_manager: FlowManager
+):
+    logger.info(f"[Flow]call_challenge_guide_assistance_callback: {result}")
+    if result["status"] == "success":
+        await flow_manager.set_node("challenge_guide_assistance", create_challenge_guide_assistance_node())
+
+async def call_empowered_state_guide_assistance(args: FlowArgs) -> FlowResult:
+    return {"status": "success", "call_guide_assistance": True}
+
+async def call_empowered_state_guide_assistance_callback(
+    args: FlowArgs,
+    result: FlowResult,
+    flow_manager: FlowManager
+):
+    logger.info(f"[Flow]call_empowered_state_guide_assistance_callback: {result}")
+    if result["status"] == "success":
+        await flow_manager.set_node("empowered_state_guide_assistance", create_empowered_state_guide_assistance_node())
+
+
+async def guide_greeting_assistance_handler(args: FlowArgs) -> FlowResult:
+    logger.info(f"[Flow]guide_greeting_assistance_handler called")
+    return {"status": "success", "call_guide_assistance": True}
+
+async def guide_greeting_assistance_callback(
+    args: FlowArgs,
+    result: FlowResult,
+    flow_manager: FlowManager
+):
+    logger.info(f"[Flow]guide_greeting_assistance_callback called with result: {result}")
+    # Always transition to guide assistance node regardless of result
+    await flow_manager.set_node("guide_assistance", create_greeting_guide_assistance_node())
+
+def create_greeting_guide_assistance_node()->NodeConfig:
+    return {
+        "role_messages": [
+            {"role": "system", "content": SYSTEM_ROLE},
+        ],
+        "task_messages": [
+            {"role": "system", "content": """I am having trouble understanding if you're ready to begin. Please raise your hand and a guide will help you.
+IMPORTANT: While waiting for the guide, you can still let me know if you're ready by saying 'I am ready'."""}
+        ],
+        "functions": [
+            FlowsFunctionSchema(
+                name="check_for_ready",
+                description="Call this when the user is ready to proceed.",
+                properties={
+                    "user_ready": {"type": "string", "description": "User's response indicating readiness"}
+                },
+                required=["user_ready"],
+                handler=greeting_ready_handler,
+                transition_callback=greeting_callback
+            ),
+            FlowsFunctionSchema(
+                name="guide_response",
+                description="Record the guide's response about participant readiness",
+                properties={"is_ready": {"type": "boolean", "description": "Whether the participant is ready to begin"}},
+                required=["is_ready"],
+                handler=greeting_guide_response_handler,
+                transition_callback=greeting_guide_response_callback
+            )
+        ],
+        "ui_override": {
+            "type": "list",
+            "prompt": "Guide: Is participant ready?",
+            "options": ["Yes", "No"]
+        }
+    }
+
+def create_name_guide_assistance_node()->NodeConfig:
+    return {
+        "role_messages": [
+            {"role": "system", "content": SYSTEM_ROLE},
+        ],
+        "task_messages": [
+            {"role": "system", "content": """I am having trouble understanding your name. Please raise your hand and a guide will help you enter your name.
+IMPORTANT: While waiting for the guide, you can still tell me your name directly."""}
+        ],
+        "functions": [
+            FlowsFunctionSchema(
+                name="collect_name",
+                description="Collect the user's name",
+                properties={
+                    "user_name": {"type": "string", "description": "The user's name"},
+                    "retry_count": {"type": "integer", "description": "Number of retries attempted"}
+                },
+                required=["user_name"],
+                handler=collect_name_handler,
+                transition_callback=collect_name_callback
+            ),
+            FlowsFunctionSchema(
+                name="guide_response",
+                description="Record the guide's input of the participant's name",
+                properties={"user_name": {"type": "string", "description": "The participant's name"}},
+                required=["user_name"],
+                handler=name_guide_response_handler,
+                transition_callback=name_guide_response_callback
+            )
+        ],
+        "ui_override": {
+            "type": "list",
+            "prompt": "Guide: Enter the participant's name",
+            "options": ["Seeker"]  # Default option
+        }
+    }
+    
+def create_challenge_guide_assistance_node()->NodeConfig:
+    return {
+        "role_messages": [
+            {"role": "system", "content": SYSTEM_ROLE},
+        ],
+        "task_messages": [
+            {"role": "system", "content": f"""I am having trouble understanding which challenge resonates with you. Please raise your hand and a guide will help you select the most appropriate challenge state.
+IMPORTANT: While waiting for the guide, you can still tell me which challenge resonates with you by looking at the poster and telling me directly.
+
+Available Challenges: {', '.join(FLOW_STATES['select_challenge']['options'])}"""}
+        ],
+        "functions": [
+            FlowsFunctionSchema(
+                name="select_challenge",
+                description="Record the user's selected challenge",
+                properties={"challenge": {"type": "string", "description": "The user's selected challenge"}},
+                required=["challenge"],
+                handler=select_challenge_handler,
+                transition_callback=select_challenge_callback
+            ),
+            FlowsFunctionSchema(
+                name="guide_response",
+                description="Record the guide's selection of the participant's challenge",
+                properties={"challenge": {"type": "string", "description": "The selected challenge"}},
+                required=["challenge"],
+                handler=challenge_guide_response_handler,
+                transition_callback=challenge_guide_response_callback
+            )
+        ],
+        "ui_override": {
+            "type": "list",
+            "prompt": "Guide: Select the most appropriate challenge state",
+            "options": FLOW_STATES["select_challenge"]["options"]
+        }
+    }
+
+def create_empowered_state_guide_assistance_node()->NodeConfig:
+    return {
+        "role_messages": [
+            {"role": "system", "content": SYSTEM_ROLE},
+        ],
+        "task_messages": [
+            {"role": "system", "content": f"""I am having trouble understanding your desired empowered state. Please raise your hand and a guide will help you identify the most appropriate empowered state.
+IMPORTANT: While waiting for the guide, you can still tell me which empowered state resonates with you by looking at the poster and telling me directly.
+
+Available Empowered States for your challenge: {', '.join(CHALLENGE_TO_EMPOWERED_STATES[flow_manager.state.get('challenge', '')])}"""}
+        ],
+        "functions": [
+            FlowsFunctionSchema(
+                name="identify_empowered_state",
+                description="Record the user's identification of their empowered state",
+                properties={"empowered_state_raw": {"type": "string", "description": "User response identifying their empowered state"},
+                            "challenge": {"type": "string", "description": "The user's previously selected challenge"}},
+                required=["empowered_state_raw", "challenge"],
+                handler=identify_empowered_state_handler,
+                transition_callback=identify_empowered_state_callback
+            ),
+            FlowsFunctionSchema(
+                name="guide_response",
+                description="Record the guide's selection of the participant's empowered state",
+                properties={"empowered_state": {"type": "string", "description": "The selected empowered state"}},
+                required=["empowered_state"],
+                handler=empowered_state_guide_response_handler,
+                transition_callback=empowered_state_guide_response_callback
+            )
+        ],
+        "ui_override": {
+            "type": "list",
+            "prompt": "Guide: Select the most appropriate empowered state",
+            "options": CHALLENGE_TO_EMPOWERED_STATES[flow_manager.state.get("challenge", "")]
+        }
+    }
+
+async def greeting_guide_response_handler(args: FlowArgs) -> FlowResult:
+    is_ready = args.get("is_ready", False)
+    return {"status": "success", "is_ready": is_ready}
+
+async def greeting_guide_response_callback(
+    args: FlowArgs,
+    result: FlowResult,
+    flow_manager: FlowManager
+):
+    logger.info(f"[Flow]greeting_guide_response_callback: {result}")
+    if result["is_ready"]:
+        await flow_manager.set_node("collect_name", create_collect_name_node())
+    else:
+        await flow_manager.set_node("greeting", create_initial_node())
+
+async def name_guide_response_handler(args: FlowArgs) -> FlowResult:
+    user_name = args.get("user_name", "").strip()
+    return {"status": "success", "user_name": user_name}
+
+async def name_guide_response_callback(
+    args: FlowArgs,
+    result: FlowResult,
+    flow_manager: FlowManager
+):
+    logger.info(f"[Flow]name_guide_response_callback: {result}")
+    await flow_manager.set_node("confirm_name", create_collect_name_node(
+        f"Great! I heard your name is {result['user_name']}. Is that correct?"
+    ))
+
+async def challenge_guide_response_handler(args: FlowArgs) -> FlowResult:
+    challenge = args.get("challenge", "").lower()
+    return {"status": "success", "challenge": challenge}
+
+async def challenge_guide_response_callback(
+    args: FlowArgs,
+    result: FlowResult,
+    flow_manager: FlowManager
+):
+    logger.info(f"[Flow]challenge_guide_response_callback: {result}")
+    await flow_manager.set_node("confirm_challenge", create_confirm_challenge_node(flow_manager))
+
+async def empowered_state_guide_response_handler(args: FlowArgs) -> FlowResult:
+    empowered_state = args.get("empowered_state", "").lower()
+    return {"status": "success", "empowered_state": empowered_state}
+
+async def empowered_state_guide_response_callback(
+    args: FlowArgs,
+    result: FlowResult,
+    flow_manager: FlowManager
+):
+    logger.info(f"[Flow]empowered_state_guide_response_callback: {result}")
+    await flow_manager.set_node("confirm_empowered_state", create_confirm_empowered_state_node(
+        emotions_summary=flow_manager.state.get("emotions_summary", ""),
+        challenge=flow_manager.state.get("challenge", "")
+    ))
 
 
 
