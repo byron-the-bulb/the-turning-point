@@ -1,0 +1,509 @@
+[
+  {
+    "Filename": "air_stones.mp4",
+    "EnviState": "Leadership",
+    "Admiration": 0.5,
+    "Interest": 0.75,
+    "Satisfaction": 0.5,
+    "Sympathy": 1.0
+  },
+  {
+    "Filename": "animal_council.mp4",
+    "EnviState": "respected",
+    "Amusement": 0.25,
+    "Awkwardness": 0.5,
+    "Entrancement": 0.75,
+    "Relief": 1.0
+  },
+  {
+    "Filename": "animal_fruit.mp4",
+    "EnviState": "Investing",
+    "Adoration": 1.0,
+    "Awe": 0.75,
+    "Excitement": 0.5,
+    "Satisfaction": 0.25
+  },
+  {
+    "Filename": "binary_face.mp4",
+    "EnviState": "Confident",
+    "Amusement": 0.25,
+    "Excitement": 0.75,
+    "Joy": 0.5,
+    "Satisfaction": 1.0
+  },
+  {
+    "Filename": "burning_forest.mp4",
+    "EnviState": "Leadership",
+    "Aesth_appreciation": 0.25,
+    "Sadness": 0.25
+  },
+  {
+    "Filename": "child+spontaneous.mp4",
+    "EnviState": "Spontaneous",
+    "Adoration": 0.25,
+    "Entrancement": 0.25,
+    "Excitement": 0.75,
+    "Interest": 0.25,
+    "Pride": 0.25,
+    "Triumph": 0.5
+  },
+  {
+    "Filename": "colored_ants.mp4",
+    "EnviState": "Recieving",
+    "Anxiety": 0.25,
+    "Awkwardness": 0.5,
+    "Excitement": 0.75,
+    "Interest": 1.0
+  },
+  {
+    "Filename": "comet_enthusiastic.mp4",
+    "EnviState": "Enthusiastic",
+    "Aesth_appreciation": 0.75,
+    "Awe": 0.75,
+    "Interest": 0.25,
+    "Relief": 0.5
+  },
+  {
+    "Filename": "comet_lake_long_2.mp4",
+    "EnviState": "Enthusiastic",
+    "Aesth_appreciation": 0.75,
+    "Awe": 0.75,
+    "Interest": 0.25,
+    "Relief": 0.5
+  },
+  {
+    "Filename": "constellation_stones.mp4",
+    "EnviState": "recieving",
+    "Awe": 1.0,
+    "Calmness": 0.75,
+    "Entrancement": 0.5,
+    "Nostalgia": 0.25
+  },
+  {
+    "Filename": "crunk_dance.mp4",
+    "EnviState": "Joyful Physical Expression",
+    "Admiration": 0.25,
+    "Awe": 0.5,
+    "Excitement": 1.0,
+    "Joy": 0.75
+  },
+  {
+    "Filename": "curious_sunflowers.mp4",
+    "EnviState": "Curious",
+    "Calmness": 0.25,
+    "Empath_pain": 0.25,
+    "Relief": 0.5
+  },
+  {
+    "Filename": "dance_party.mp4",
+    "EnviState": "Enthusiastic"
+  },
+  {
+    "Filename": "dancer_full_capacity_long.mp4",
+    "EnviState": "Full Capacity",
+    "Calmness": 0.25,
+    "Empath_pain": 0.5,
+    "Entrancement": 0.25,
+    "Pride": 0.25,
+    "Satisfaction": 0.25,
+    "Sex_desire": 0.25,
+    "Triumph": 0.25
+  },
+  {
+    "Filename": "dancer.mp4",
+    "EnviState": "enthusiastic",
+    "Amusement": 0.5,
+    "Awe": 0.25
+  },
+  {
+    "Filename": "dancer2.mp4",
+    "EnviState": "enthusiastic",
+    "Aesth_appreciation": 0.75,
+    "Entrancement": 0.5,
+    "Joy": 0.25,
+    "Sex_desire": 1.0
+  },
+  {
+    "Filename": "decisive_bird.mp4.",
+    "EnviState": "Decisive",
+    "Aesth_appreciation": 0.25,
+    "Calmness": 0.25,
+    "Interest": 0.5,
+    "Joy": 0.75,
+    "Relief": 1.0
+  },
+  {
+    "Filename": "eager_coxswain.mp4",
+    "EnviState": "Leadership",
+    "Admiration": 0.25,
+    "Amusement": 0.5,
+    "Envy": 0.75,
+    "Joy": 1.0
+  },
+  {
+    "Filename": "energetic_waves.mp4",
+    "EnviState": "Energetic",
+    "Aesth_appreciation": 0.25,
+    "Excitement": 0.75,
+    "Interest": 0.25,
+    "Joy": 1.0,
+    "Pride": 0.25,
+    "Relief": 0.25
+  },
+  {
+    "Filename": "evolve_man.mp4",
+    "EnviState": "Accepting Change",
+    "Admiration": 0.25,
+    "Amusement": 0.75,
+    "Interest": 0.5,
+    "Nostalgia": 1.0
+  },
+  {
+    "Filename": "evolving_robot.mp4",
+    "EnviState": "Accepting Change"
+  },
+  {
+    "Filename": "finish_line.mp4",
+    "EnviState": "Focused Clarity",
+    "Admiration": 0.25,
+    "Entrancement": 0.5,
+    "Satisfaction": 0.75,
+    "Triumph": 1.0
+  },
+  {
+    "Filename": "floating_islands2.mp4",
+    "EnviState": "focused clarity",
+    "Awe": 0.25,
+    "Excitement": 1.0,
+    "Interest": 0.5,
+    "Satisfaction": 1.0
+  },
+  {
+    "Filename": "glowing _roots.mp4",
+    "EnviState": "Confident",
+    "Amusement": 0.25,
+    "Calmness": 0.5,
+    "Excitement": 0.75,
+    "Interest": 1.0
+  },
+  {
+    "Filename": "glowing_footprints.mp4",
+    "EnviState": "accepting change",
+    "Admiration": 1.0,
+    "Calmness": 0.25,
+    "Excitement": 0.75,
+    "Nostalgia": 0.5
+  },
+  {
+    "Filename": "glowing_runner.mp4",
+    "EnviState": "Honoring Body",
+    "Admiration": 0.25,
+    "Excitement": 0.5,
+    "Nostalgia": 0.75,
+    "Satisfaction": 1.0
+  },
+  {
+    "Filename": "heart_city_leadership.mp4",
+    "EnviState": "Leadership",
+    "Adoration": 0.5,
+    "Awe": 0.25,
+    "Entrancement": 0.25,
+    "Satisfaction": 0.5
+  },
+  {
+    "Filename": "honey_desert.mp4",
+    "EnviState": "Indulging in pleasure"
+  },
+  {
+    "Filename": "iridescent dancer.mp4",
+    "EnviState": "enthusiastic",
+    "Amusement": 0.5,
+    "Awe": 0.25,
+    "Excitement": 0.75,
+    "Surprise": 1.0
+  },
+  {
+    "Filename": "jellyfish_glow.mp4",
+    "EnviState": " Empathetic",
+    "Aesth_appreciation": 1.0,
+    "Anxiety": 0.25,
+    "Joy": 0.75,
+    "Sex_desire": 0.5
+  },
+  {
+    "Filename": "joyful_mandala.mp4",
+    "EnviState": "joyful physical expression",
+    "Amusement": 0.25,
+    "Excitement": 1.0,
+    "Interest": 0.25,
+    "Joy": 1.0,
+    "Pride": 0.5,
+    "Relief": 0.25,
+    "Satisfaction": 0.25,
+    "Surprise": 0.25
+  },
+  {
+    "Filename": "kaleidascope.mp4",
+    "EnviState": "Decisive",
+    "Aesth_appreciation": 0.25,
+    "Amusement": 0.5,
+    "Excitement": 0.75,
+    "Interest": 1.0,
+    "Joy": 0.75,
+    "Nostalgia": 1.0
+  },
+  {
+    "Filename": "leadership_footprints.mp4",
+    "EnviState": "Leadership",
+    "Admiration": 0.25,
+    "Calmness": 1.0,
+    "Entrancement": 0.5,
+    "Excitement": 0.75,
+    "Interest": 1.0
+  },
+  {
+    "Filename": "leaf_compass_2.mp4",
+    "EnviState": "trusting others",
+    "Admiration": 1.0,
+    "Aesth_appreciation": 0.25,
+    "Calmness": 1.0,
+    "Interest": 0.75,
+    "Joy": 0.25,
+    "Nostalgia": 0.5,
+    "Relief": 0.25,
+    "Sympathy": 0.75
+  },
+  {
+    "Filename": "levitate_woman.mp4",
+    "EnviState": "Relaxed",
+    "Admiration": 1.0,
+    "Awe": 0.75,
+    "Entrancement": 0.5,
+    "Joy": 0.25
+  },
+  {
+    "Filename": "lightning_bush.mp4",
+    "EnviState": "Courageous",
+    "Aesth_appreciation": 0.25,
+    "Awe": 0.5,
+    "Calmness": 0.75,
+    "Entrancement": 1.0
+  },
+  {
+    "Filename": "lightning_tree_long_2.mp4",
+    "EnviState": "Courageous",
+    "Aesth_appreciation": 0.25,
+    "Awe": 0.5,
+    "Calmness": 0.75,
+    "Entrancement": 1.0
+  },
+  {
+    "Filename": "lightning_tree_long.mp4",
+    "EnviState": "Courageous",
+    "Aesth_appreciation": 0.25,
+    "Awe": 0.5,
+    "Calmness": 0.75,
+    "Entrancement": 1.0
+  },
+  {
+    "Filename": "lightning_tree.mp4",
+    "EnviState": "Courageous",
+    "Awe": 0.25,
+    "Excitement": 0.75,
+    "Surprise": 1.0
+  },
+  {
+    "Filename": "mask_off.mp4",
+    "EnviState": "Self-love",
+    "Admiration": 1.0,
+    "Amusement": 0.75,
+    "Entrancement": 0.5,
+    "Excitement": 0.25
+  },
+  {
+    "Filename": "moss_throne.mp4",
+    "EnviState": "recieving",
+    "Aesth_appreciation": 0.25,
+    "Calmness": 0.5,
+    "Interest": 0.75,
+    "Joy": 1.0
+  },
+  {
+    "Filename": "pearl.mp4",
+    "EnviState": "investing",
+    "Awe": 0.25,
+    "Confusion": 0.75,
+    "Entrancement": 0.5
+  },
+  {
+    "Filename": "puzzle_globe.mp4",
+    "EnviState": "Leadership",
+    "Aesth_appreciation": 1.0,
+    "Amusement": 0.75,
+    "Awe": 0.5,
+    "Entrancement": 0.25
+  },
+  {
+    "Filename": "raindrops.mp4",
+    "EnviState": "Engaged",
+    "Anxiety": 0.25,
+    "Entrancement": 0.5,
+    "Interest": 0.75,
+    "Surprise": 1.0
+  },
+  {
+    "Filename": "receiving_arms.mp4",
+    "EnviState": "Recieving",
+    "Aesth_appreciation": 0.25,
+    "Amusement": 0.75,
+    "Awe": 1.0,
+    "Calmness": 0.5
+  },
+  {
+    "Filename": "relaxed_canyon.mp4",
+    "EnviState": "Relaxed",
+    "Awe": 1.0,
+    "Calmness": 0.75,
+    "Interest": 0.5
+  },
+  {
+    "Filename": "resin_joy.mp4",
+    "EnviState": "Honoring Body ",
+    "Awe": 1.0,
+    "Entrancement": 0.75,
+    "Interest": 0.25,
+    "Satisfaction": 0.5
+  },
+  {
+    "Filename": "risking_fish.mp4",
+    "EnviState": "Risking",
+    "Adoration": 0.25,
+    "Calmness": 0.5,
+    "Empath_pain": 0.25,
+    "Horror": 0.25,
+    "Joy": 0.0,
+    "Relief": 0.5,
+    "Sympathy": 0.25
+  },
+  {
+    "Filename": "risking-mountain.mp4",
+    "EnviState": "Risking",
+    "Aesth_appreciation": 0.75,
+    "Calmness": 0.25,
+    "Entrancement": 0.25,
+    "Horror": 0.25,
+    "Pride": 0.75,
+    "Relief": 0.25
+  },
+  {
+    "Filename": "river_reverse.mp4",
+    "EnviState": "experimental",
+    "Aesth_appreciation": 0.25,
+    "Calmness": 0.33,
+    "Nostalgia": 0.25
+  },
+  {
+    "Filename": "spontaneous_flowers.mp4",
+    "EnviState": "Spontaneous",
+    "Admiration": 0.25,
+    "Amusement": 0.5,
+    "Interest": 0.75,
+    "Joy": 1.0
+  },
+  {
+    "Filename": "steadfast_fox.mp4",
+    "EnviState": "relaxed",
+    "Amusement": 0.25,
+    "Entrancement": 0.75,
+    "Interest": 1.0,
+    "Satisfaction": 0.25
+  },
+  {
+    "Filename": "sunbreak_flowers_long_2.mp4",
+    "EnviState": "enthusiastic",
+    "Aesth_appreciation": 1.0,
+    "Awe": 0.25,
+    "Calmness": 0.5,
+    "Joy": 0.75
+  },
+  {
+    "Filename": "sunbreak_flowers_long.mp4",
+    "EnviState": "enthusiastic",
+    "Aesth_appreciation": 1.0,
+    "Awe": 0.25,
+    "Calmness": 0.5,
+    "Joy": 0.75
+  },
+  {
+    "Filename": "sunbreak_flowers.mp4",
+    "EnviState": "enthusiastic",
+    "Aesth_appreciation": 1.0,
+    "Awe": 0.25,
+    "Calmness": 0.5,
+    "Joy": 0.75
+  },
+  {
+    "Filename": "tall_grass.mp4",
+    "EnviState": "joyful physical expression",
+    "Anxiety": 0.25,
+    "Calmness": 0.5,
+    "Interest": 0.75,
+    "Sympathy": 1.0
+  },
+  {
+    "Filename": "trust_fall.mp4",
+    "EnviState": "trusting others",
+    "Admiration": 1.0,
+    "Aesth_appreciation": 0.75,
+    "Awe": 0.5,
+    "Excitement": 0.25
+  },
+  {
+    "Filename": "ugly_seed.mp4",
+    "EnviState": "Experimental",
+    "Amusement": 0.5,
+    "Excitement": 1.0,
+    "Interest": 0.75,
+    "Joy": 0.5
+  },
+  {
+    "Filename": "water_crown.mp4",
+    "EnviState": "communing",
+    "Admiration": 0.25,
+    "Awe": 1.0,
+    "Satisfaction": 0.25
+  },
+  {
+    "Filename": "waterfall_crown_2.mp4",
+    "EnviState": "communing",
+    "Aesth_appreciation": 0.25,
+    "Calmness": 0.5,
+    "Joy": 0.75,
+    "Satisfaction": 1.0
+  },
+  {
+    "Filename": "waterfall_crown.mp4",
+    "EnviState": "communing",
+    "Aesth_appreciation": 0.25,
+    "Calmness": 0.5,
+    "Joy": 0.75,
+    "Satisfaction": 1.0
+  },
+  {
+    "Filename": "waterfall.mp4",
+    "EnviState": "honoring body",
+    "Admiration": 0.25,
+    "Aesth_appreciation": 0.5,
+    "Interest": 0.75,
+    "Romance": 1.0
+  },
+  {
+    "Filename": "leadership_stones_short.mp4",
+    "EnviState": "Leadership",
+    "Admiration": 0.25,
+    "Calmness": 1.0,
+    "Entrancement": 0.5,
+    "Excitement": 0.75,
+    "Interest": 1.0
+  }
+]
