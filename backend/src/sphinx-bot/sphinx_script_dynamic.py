@@ -12,7 +12,7 @@ SYSTEM_ROLE = """"You are Sphinx, a therapeutic guide helping users explore stuc
     
     IMPORTANT: 
     1. Your responses will be converted to audio, avoid special characters or text formatting that is not translatable. Avoid hypens between sentences.
-    2. Do not repeat yourself, dont be too succint but dont be verbose either.
+    2. Do not repeat yourself, be very succint.
     3. Insert a <break time="500ms"/> tag between sentences (after periods, exclamation points, or question marks followed by a space).
     4. Ensure sentences are properly punctuated to mark sentence boundaries.
     5. Do not use SSML tags other than <break> unless explicitly requested.
@@ -131,11 +131,13 @@ def create_initial_node()->NodeConfig:
 
 async def collect_name_handler(args : FlowArgs) -> FlowResult:
     user_name = args["user_name"]
+    logger.info(f"[Flow]collect_name_handler: {user_name}")
     # This will be sent back to the client in a TranscriptionFrame
     return {"status": "success", "user_name": user_name}
 
 async def confirm_name_handler(args : FlowArgs) -> FlowResult:
     confirmed = args["confirmed"]
+    logger.info(f"[Flow]confirm_name_handler: {confirmed}")
     return {"status": "success", "confirmed": confirmed}
 
 async def confirm_name_callback(
@@ -212,7 +214,7 @@ def create_select_challenge_node()->NodeConfig:
         "functions": [
             FlowsFunctionSchema(
                 name="select_challenge",
-                description="Record the user's selected challenge",
+                description=f"Record the user's selected challenge, match the user challenge with one of the following options: {', '.join(FLOW_STATES['select_challenge']['options'])}",
                 properties={"challenge": {"type": "string", "description": "The user's selected challenge"}},
                 required=["challenge"],
                 handler=select_challenge_handler,
@@ -239,7 +241,7 @@ async def confirm_challenge_callback(
 ):
     logger.info(f"[Flow]confirm_challenge_callback {result}")
     if result["status"] == "success":
-        await flow_manager.set_node("record_challenge_in_depth", create_record_challenge_in_depth_node())
+        await flow_manager.set_node("explore_challenge", create_record_challenge_in_depth_node())
     else:
         await flow_manager.set_node("select_challenge", create_select_challenge_node())
 
@@ -301,7 +303,7 @@ async def record_challenge_in_depth_callback(
             emotions_summary=emotions_summary,
             challenge=challenge))
     else:
-        await flow_manager.set_node("challenge_in_depth", create_record_challenge_in_depth_node())
+        await flow_manager.set_node("explore_challenge", create_record_challenge_in_depth_node())
 
 
 def create_record_challenge_in_depth_node()->NodeConfig:
@@ -348,7 +350,7 @@ async def confirm_emotions_callback(
     if result.get("emotions_confirmed"):
         await flow_manager.set_node("identify_empowered_state", create_identify_empowered_state_node())
     else:
-        await flow_manager.set_node("challenge_in_depth", create_record_challenge_in_depth_node())
+        await flow_manager.set_node("explore_challenge", create_record_challenge_in_depth_node())
 
 
 def create_confirm_emotions_node(emotions_summary: str, challenge: str)->NodeConfig:
@@ -401,11 +403,13 @@ async def identify_empowered_state_callback(
     challenge = result.get("challenge", "")
     
     if result["empowered_state_raw"] and result["emotions_fully_processed"]:
+        logger.info(f"[Flow]identify_empowered_state_callback : going to confirm_empowered_state {emotions_summary}, {challenge}")
         await flow_manager.set_node("confirm_empowered_state", create_confirm_empowered_state_node(
             emotions_summary=emotions_summary,
             challenge=challenge
             ))
     else:
+        logger.info(f"[Flow]identify_empowered_state_callback : going back identify_empowered_state")
         await flow_manager.set_node("identify_empowered_state", create_identify_empowered_state_node())
 
 def create_identify_empowered_state_node()->NodeConfig:

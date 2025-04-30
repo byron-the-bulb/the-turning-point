@@ -1,0 +1,11 @@
+[
+    {"text": "I am ready", "node": "greeting"},
+    {"text": "My name is John", "node": "collect_name"},
+    {"text": "Yes", "node": "collect_name"},
+    {"text": "I feel anxious", "node": "select_challenge"},
+    {"text": "Yes", "node": "confirm_challenge"},
+    {"text": "It's like I'm always on edge", "node": "explore_challenge"},
+    {"text": "Yes", "node": "confirm_emotions"},
+    {"text": "I’d feel confident and calm", "node": "identify_empowered_state"},
+    {"text": "Yes", "node": "confirm_empowered_state"}
+]
