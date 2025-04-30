@@ -124,11 +124,9 @@ FLOW_STATES = {
    
 
 async def greeting_ready_handler(args: FlowArgs, flow_manager: FlowManager) -> FlowResult:
-    user_ready = args.get("user_ready", "").lower()
+    user_ready = args.get("user_ready", "")
     logger.info(f"[Flow]greeting_ready_handler: user_ready={user_ready}")
-    
-    if "ready" in user_ready:
-        return {"status": "success"}
+    return {"status": "success", "user_ready": user_ready}
 
 
 async def greeting_callback(
@@ -137,7 +135,7 @@ async def greeting_callback(
     flow_manager: FlowManager
 ):
     logger.info(f"[Flow]greeting_callback: {result}")
-    if result["status"] == "success":
+    if result["status"] == "success" and result["user_ready"]:
         await flow_manager.set_node("collect_name", create_collect_name_node())
     else:
         await flow_manager.set_node("greeting", create_initial_node())
@@ -156,7 +154,7 @@ def create_initial_node()->NodeConfig:
                 name="check_for_ready",
                 description="Call this when the user is ready to proceed.",
                 properties={
-                    "user_ready": {"type": "string", "description": "User's response indicating readiness"}
+                    "user_ready": {"type": "boolean", "description": "User's response indicating readiness"}
                 },
                 required=["user_ready"],
                 handler=greeting_ready_handler,
@@ -207,7 +205,7 @@ async def collect_name_callback(
 ):
     logger.info(f"[Flow]collect_name_callback: {result}")
     if result["status"] == "success":
-        await flow_manager.set_node("confirm_name", create_collect_name_node(
+        await flow_manager.set_node("collect_name", create_collect_name_node(
             f"Great! I heard your name is {result['user_name']}. Is that correct?"
         ))
     elif result["status"] == "retry":
@@ -537,8 +535,11 @@ Available Empowered States for your challenge: {', '.join(CHALLENGE_TO_EMPOWERED
 # Confirm Empowered State
 ########################################################################
 
-async def confirm_empowered_state_handler(args: FlowArgs) -> FlowResult:
-    return {"status": "success", "empowered_state_confirmed": True}
+async def confirm_empowered_state_handler(args: FlowArgs, flow_manager: FlowManager) -> FlowResult:
+    empowered_state = args.get("empowered_state", "").lower()
+    logger.info(f"[Flow]confirm_empowered_state_handler: {empowered_state}")
+    flow_manager.state["empowered_state"] = empowered_state
+    return {"status": "success", "empowered_state_confirmed": True, "empowered_state": empowered_state}
 
 async def confirm_empowered_state_callback(
     args: FlowArgs,
@@ -558,15 +559,21 @@ def create_confirm_empowered_state_node(emotions_summary: str, challenge: str)->
         "task_messages": [
             {"role": "system", "content": f"Emotions Detected: {emotions_summary}. \
                 Available Empowered States: {', '.join(CHALLENGE_TO_EMPOWERED_STATES[challenge])}. \
-                Using his previous answer text and the emotions detected above pick the correct Empowered State. \
-                Then confirm the emotions and the empowered state you selected with the user. For example: 'It sounds like you will feel {emotions_summary} as you move toward {empowered_state}. Is that correct?'"}
+                Using the user's previous answer text and the emotions detected above pick the correct Empowered State from the list of available Empowered States for the selected challenge {challenge}. \
+                Then confirm the emotions and the empowered state you selected with the user. For example: 'It sounds like you will feel {emotions_summary} as you move toward <say empowered state here>. Is that correct?'"}
         ],
         "functions": [
             FlowsFunctionSchema(
                 name="confirm_empowered_state",
                 description="Record the user's confirmation of the empowered state and emotions",
-                properties={"user_input": {"type": "string", "description": "User response confirming the empowered state and emotions"}},
-                required=["user_input"],
+                properties={"user_input": {
+                    "type": "string", 
+                    "description": "User response confirming the empowered state and emotions"},
+                    "empowered_state": {
+                        "type": "string", 
+                        "description": "Empowered state selected by the user"}
+                },
+                required=["user_input", "empowered_state"],
                 handler=confirm_empowered_state_handler,
                 transition_callback=confirm_empowered_state_callback
             )
@@ -839,7 +846,7 @@ async def name_guide_response_callback(
     flow_manager: FlowManager
 ):
     logger.info(f"[Flow]name_guide_response_callback: {result}")
-    await flow_manager.set_node("confirm_name", create_collect_name_node(
+    await flow_manager.set_node("collect_name", create_collect_name_node(
         f"Great! I heard your name is {result['user_name']}. Is that correct?"
     ))
 
