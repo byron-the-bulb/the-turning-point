@@ -219,6 +219,22 @@ export default function Home() {
             logSetPendingUIOverride(null);
             setIsWaitingForUser(true);
           }
+        } else if (event.trigger === "VideoTrigger") {
+          console.log('Video trigger received, empowered_state_data:', event.empowered_state_data);
+          if (event.empowered_state_data) {
+            // Call the trigger_video API endpoint with the empowered_state_data
+            fetch('/api/trigger_video', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                empowered_state_data: event.empowered_state_data
+              })
+            }).catch(error => {
+              console.error('Error calling trigger_video endpoint:', error);
+            });
+          }
         } else if (event.emotion) {
           console.log('Emotion received:', event.emotion);
           if (event.emotion.prosody && event.emotion.prosody.predictions && event.emotion.prosody.predictions.length > 0) {
@@ -227,7 +243,7 @@ export default function Home() {
             setEmotionData({
               predictions: event.emotion.prosody.predictions
             });
-
+            
             // Add emotions as a special message in the chat log
             if (event.emotion.prosody.predictions[0].emotions) {
               // Sort emotions by score and take top 5

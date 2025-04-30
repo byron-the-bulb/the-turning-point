@@ -61,6 +61,26 @@ class StatusUpdater:
             logger.error(f"Error triggering UI override: {e}")
             return False
 
+    async def trigger_video(self, status, empowered_state_data):
+        logger.info(f"Triggering video with status: {status} and empowered state data: {empowered_state_data}")
+        if not self.rtvi:
+            logger.error("StatusUpdater not initialized with RTVI processor")
+            return False
+        
+        data = {
+            "trigger": "VideoTrigger",
+            "identifier": self.identifier,
+            "empowered_state_data": empowered_state_data
+        }
+        
+        try:
+            status_frame = RTVIServerMessageFrame(data)
+            await self.rtvi.push_frame(status_frame)
+            return True
+        except Exception as e:
+            logger.error(f"Error triggering video: {e}")
+            return False
+
     async def close(self):
         logger.info("Sending goodbye system status")
         if not self.rtvi:

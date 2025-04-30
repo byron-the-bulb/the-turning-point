@@ -349,6 +349,7 @@ async def run_bot(room_url, token, identifier, data=None):
                 
                 combined_emotions[emotion_name] = combined_score
             
+            flow_manager.state["combined_emotions"] = combined_emotions
             # Sort emotions by combined score and take top 3
             top_emotions = sorted(combined_emotions.items(), key=lambda x: x[1], reverse=True)[:3]
             

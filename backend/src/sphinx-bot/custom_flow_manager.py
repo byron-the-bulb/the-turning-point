@@ -28,3 +28,20 @@ class CustomFlowManager(FlowManager):
                 f"Stage {node_name} active",
                 {"node": node_name}
             )
+
+        #hack
+        if node_name=="goodbye":
+            logger.info("Goodbye node reached")
+            if "empowered_state" in self.state and self.state["empowered_state"]:
+                logger.info("Empowered state detected: {}".format(self.state["empowered_state"]))
+                
+                empowered_state = self.state["empowered_state"]
+                combined_emotions = self.state.get("combined_emotions", None)
+                challenge = self.state.get("challenge", None)
+                
+                await status_updater.trigger_video(
+                    f"Empowered state detected : {empowered_state}",
+                    {"empowered_state" : empowered_state,
+                    "combined_emotions" : combined_emotions,
+                    "challenge" : challenge}
+                )
