@@ -21,6 +21,9 @@ app = FastAPI()
 # Mount templates directory
 templates = Jinja2Templates(directory="templates")
 
+# Mount static files directory
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # Initialize request queue
 request_queue = deque()
 

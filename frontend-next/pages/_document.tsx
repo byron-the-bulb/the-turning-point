@@ -18,6 +18,39 @@ export default function Document() {
         
         {/* Manifest */}
         <link rel="manifest" href="/manifest.json" />
+        
+        {/* Global styles */}
+        <style>{`
+          body {
+            background-image: url('/TurningPointBackground.png');
+            background-size: contain;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            background-color: #f1ede9;
+            min-height: 100vh;
+            position: relative;
+          }
+          
+          body::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(241, 237, 233, 0.6);
+            z-index: -1;
+          }
+          
+          /* Apply the same theme to containers and cards */
+          .card, 
+          .container,
+          .card-body,
+          .modal-content {
+            background-color: rgba(241, 237, 233, 0.8) !important;
+          }
+        `}</style>
       </Head>
       <body>
         <Main />

@@ -8,7 +8,24 @@
             max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f0f0f0;
+            background-image: url('../static/TurningPointBackground.png');
+            background-size: contain;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            position: relative;
+            min-height: 100vh;
+            background-color: #f1ede9; /* Background color around the image */
+        }
+        body::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(241, 237, 233, 0.6); /* #f1ede9 with transparency */
+            z-index: -1;
         }
         .container {
             display: flex;
@@ -16,14 +33,14 @@
         }
         .queue {
             flex: 1;
-            background-color: white;
+            background-color: rgba(241, 237, 233, 0.8); /* #f1ede9 with transparency */
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .slots {
             flex: 1;
-            background-color: white;
+            background-color: rgba(241, 237, 233, 0.8); /* #f1ede9 with transparency */
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -33,7 +50,7 @@
             border: 1px solid #eee;
             margin-bottom: 10px;
             border-radius: 4px;
-            background-color: #f8f8f8;
+            background-color: rgba(248, 248, 248, 0.9);
             cursor: move;
         }
         .slot {
@@ -42,24 +59,27 @@
             margin-bottom: 10px;
             border-radius: 4px;
             min-height: 60px;
-            background-color: #f8f8f8;
+            background-color: rgba(248, 248, 248, 0.7);
         }
         .slot.dragover {
-            background-color: #e3f2fd;
+            background-color: rgba(227, 242, 253, 0.8);
             border-color: #2196F3;
         }
         .queue.dragover {
-            background-color: #e3f2fd;
+            background-color: rgba(227, 242, 253, 0.8);
         }
         .slot-item {
             padding: 10px;
-            background-color: #4CAF50;
+            background-color: rgba(76, 175, 80, 0.9);
             color: white;
             border-radius: 4px;
             margin-bottom: 5px;
         }
+        h1, h2 {
+            text-shadow: 0 0 5px white; /* Add text shadow for better readability */
+        }
         .play-all-button {
-            background-color: #2196F3;
+            background-color: rgba(33, 150, 243, 0.9);
             color: white;
             border: none;
             padding: 15px 30px;
@@ -68,12 +88,14 @@
             font-size: 18px;
             margin-top: 20px;
             width: 100%;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.5); /* Add text shadow for better readability */
+            font-weight: bold;
         }
         .play-all-button:hover {
-            background-color: #1976D2;
+            background-color: rgba(25, 118, 210, 0.95);
         }
         .play-all-button:disabled {
-            background-color: #cccccc;
+            background-color: rgba(204, 204, 204, 0.8);
             cursor: not-allowed;
         }
         .status {
