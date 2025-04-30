@@ -1,11 +1,14 @@
-[
+{
+    "user_messages": [
     {"text": "I am ready", "node": "greeting"},
     {"text": "My name is John", "node": "collect_name"},
     {"text": "Yes", "node": "collect_name"},
-    {"text": "I feel anxious", "node": "select_challenge"},
+    {"text": "I feel anxious. It's like I'm always on edge", "node": "identify_challenge"},
     {"text": "Yes", "node": "confirm_challenge"},
-    {"text": "It's like I'm always on edge", "node": "explore_challenge"},
-    {"text": "Yes", "node": "confirm_emotions"},
-    {"text": "I’d feel confident and calm", "node": "identify_empowered_state"},
-    {"text": "Yes", "node": "confirm_empowered_state"}
-]
+    {"text": "I’d feel a bit more relaxed, looking forward to the future and excited to take on challenges", "node": "identify_empowered_state", 
+    "flow_manager_state" : {"emotions_summary": "Relief, Contentment, Excitement", "emotions_fully_processed": true}},
+    {"text": "Yes", "node": "confirm_empowered_state"},
+    {"text": "goodbye", "node": "goodbye"}
+],
+    "expected_empowered_states" : ["Confident", "Experimental and Risking", "Courageous", "Leadership"]
+}
