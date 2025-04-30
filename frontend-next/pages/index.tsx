@@ -34,14 +34,23 @@ const defaultTtsConfig: TTSConfig = {
   emotion: null
 };
 
+// Define an interface that extends TTSConfig to include stationName
+interface ClientConfig extends TTSConfig {
+  stationName?: string;
+}
+
 // Function to create a Pipecat client with the given TTS configuration
-const createClient = (ttsConfig = defaultTtsConfig) => {
+const createClient = (config: ClientConfig = defaultTtsConfig) => {
   try {
+    // Extract TTS config and station name
+    const { stationName, ...ttsConfig } = config;
+    
     return new RTVIClient({
       params: {
         baseUrl: API_URL,
         requestData: {
-          tts: ttsConfig
+          tts: ttsConfig,
+          stationName // Include stationName in the request data
         },
         endpoints: { connect: process.env.NEXT_PUBLIC_API_ENDPOINT || '/connect' },
       },
@@ -76,8 +85,14 @@ export default function Home() {
   const [isConnected, setIsConnected] = useState(false);
   const [isWaitingForParticipant, setIsWaitingForParticipant] = useState(false);
   const [emotionData, setEmotionData] = useState<EmotionData | null>(null);
+  const [stationName, setStationName] = useState('Station 1'); // Default station name
   const eventHandlersAttached = useRef(false);
   const initialMessageSent = useRef(false);
+
+  // Handle station name change
+  const handleStationNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setStationName(e.target.value);
+  };
 
   // Custom setter to log all updates to pendingUIOverride
   const logSetPendingUIOverride = useCallback((newValue: any | null) => {
@@ -235,6 +250,28 @@ export default function Home() {
               console.error('Error calling trigger_video endpoint:', error);
             });
           }
+        } else if (event.trigger === "NeedsHelp") {
+          console.log('NeedsHelp trigger received, help_data:', event.help_data);
+          if (event.help_data) {
+            // Call the needs_help API endpoint with the help data
+            fetch('/api/needs_help', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                help_data: event.help_data
+              })
+            }).catch(error => {
+              console.error('Error calling needs_help endpoint:', error);
+            });
+            
+            // Show help request in chat log with both station name and phase
+            const helpMessage = event.help_data.needs_help
+              ? `${event.help_data.user} needs help with ${event.help_data.phase}`
+              : `Help request resolved for ${event.help_data.user} (${event.help_data.phase})`;
+            addChatMessage(helpMessage, 'system');
+          }
         } else if (event.emotion) {
           console.log('Emotion received:', event.emotion);
           if (event.emotion.prosody && event.emotion.prosody.predictions && event.emotion.prosody.predictions.length > 0) {
@@ -377,12 +414,15 @@ export default function Home() {
   }, [addChatMessage, logSetPendingUIOverride]);
 
   const handleStartConnection = useCallback(() => {
-    console.log('Starting connection with TTS config:', ttsConfig);
+    console.log('Starting connection with TTS config:', ttsConfig, 'and station name:', stationName);
     setStatusText('Starting connection...');
     setIsConnecting(true);
 
-    // Create a new client with the current TTS configuration
-    clientInstance = createClient(ttsConfig);
+    // Create a new client with the current TTS configuration and station name
+    clientInstance = createClient({
+      ...ttsConfig,
+      stationName // Add station name to the configuration
+    });
 
     if (!clientInstance) {
       console.error('Failed to create client');
@@ -408,7 +448,7 @@ export default function Home() {
       // Clean up client
       clientInstance = null;
     });
-  }, [ttsConfig, setupEventHandlers]);
+  }, [ttsConfig, setupEventHandlers, stationName]); // Add stationName to dependencies
 
   const handleStopConnection = useCallback(() => {
     if (!clientInstance) return;
@@ -458,6 +498,19 @@ export default function Home() {
             selectedEmotions={selectedEmotions}
             onSpeedSelect={handleSpeedSelect}
             onEmotionsChange={handleEmotionsChange}
+          />
+        </div>
+
+        {/* Add Station Name Input */}
+        <div className={styles.stationNameContainer}>
+          <label htmlFor="stationName" className={styles.stationNameLabel}>Station Name:</label>
+          <input 
+            type="text" 
+            id="stationName" 
+            value={stationName} 
+            onChange={handleStationNameChange} 
+            className={styles.stationNameInput}
+            disabled={isConnected || isConnecting} // Disable when connected
           />
         </div>
 

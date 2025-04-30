@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, validator, ValidationError
+from pydantic import BaseModel, validator, ValidationError, Field
 from typing import List, Dict, Optional
 import os
 from collections import deque
@@ -90,9 +90,15 @@ class PlayAllRequest(BaseModel):
                 raise ValueError(f'Invalid slot index: {video.index}. Must be between 0 and 5')
         return v
 
+class HelpRequest(BaseModel):
+    user: str = Field(..., description="The name of the user or stage requiring assistance (e.g., 'Greeting', 'Name collection', etc.)")
+    needs_help: bool = Field(..., description="Set to true to request help, false to cancel help request")
+
 # Global variables
 metadata = load_metadata()
 client = create_osc_client()
+help_needed = False  # Track help state
+help_user = ""  # Track who needs help
 
 def find_matching_video(envi_state: str, emotions: Dict[str, float]) -> Optional[str]:
     """
@@ -175,6 +181,13 @@ def trigger_video(filename: str, name: str, challenge_point: str, envi_state: st
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/help", response_class=HTMLResponse)
+async def help_monitor(request: Request):
+    """
+    Display the Help Status Monitor page
+    """
+    return templates.TemplateResponse("help_status.html", {"request": request})
 
 @app.post("/trigger_video")
 async def trigger_video_endpoint(request: VideoRequest):
@@ -261,6 +274,48 @@ async def play_all_videos(request: PlayAllRequest):
     except Exception as e:
         print(f"Error in play_all_videos: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/needs_help", response_model=dict)
+async def needs_help_endpoint(request: HelpRequest):
+    """
+    Set help status for a specific user. Can be used to start or stop help requests.
+    Returns the current help status to be displayed in the web interface.
+    
+    - **user**: Name of the user or stage requiring assistance (e.g., 'Greeting', 'Name collection')
+    - **needs_help**: Set to true to request help, false to cancel help request
+    """
+    global help_needed, help_user
+    
+    # Update help state based on the request
+    help_needed = request.needs_help
+    
+    if help_needed:
+        help_user = request.user
+        message = f"{help_user} NEEDS HELP"
+        print(f"[HELP REQUESTED]: {message}")
+    else:
+        previous_user = help_user
+        help_user = ""
+        message = f"Help request for {previous_user} resolved"
+        print(f"[HELP RESOLVED]: {message}")
+    
+    return {
+        "status": "success",
+        "help_needed": help_needed,
+        "help_user": help_user,
+        "message": message
+    }
+
+@app.get("/help_status")
+async def help_status():
+    """
+    Get the current help status
+    """
+    return {
+        "help_needed": help_needed,
+        "help_user": help_user,
+        "message": f"{help_user} NEEDS HELP" if help_needed else "No help needed"
+    }
 
 if __name__ == "__main__":
     import uvicorn

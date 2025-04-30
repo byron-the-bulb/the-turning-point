@@ -107,28 +107,40 @@ async def run_bot(room_url, token, identifier, data=None):
     """Run the Sphinx voice bot with the provided room URL and token.
     
     Args:
-        room_url: The URL of the Daily room to connect to
-        token: The access token for the Daily room
-        identifier: A unique identifier for this bot instance
-        data: Optional JSON-encoded data passed from the server
+        room_url: The URL of the Daily room to join.
+        token: The token to use for authentication with Daily.
+        identifier: Unique identifier for this bot instance.
+        data: Optional JSON-encoded data passed from the server.
     """
-    logger.info(f"Starting Sphinx bot in room {room_url} with identifier {identifier}")
+    logger.info(f"Starting Sphinx bot with room URL: {room_url}, token: {token[:8]}..., identifier: {identifier}")
     
-    # print all env variables
-    #logger.info(f"All environment variables: {dict(os.environ)}")
-    # Parse the data if provided
-    logger.info(f"Received data: {data}")
-    config_data = {}
+    # Default station name
+    station_name = "Unknown Station"
+    
+    # Extract station name from data if available
     if data:
         try:
-
-            # Decode base64-encoded JSON data
-            decoded_data = base64.b64decode(data).decode()
-            logger.info(f"Decoded data: {decoded_data}")
-            config_data = json.loads(decoded_data)
-            logger.info(f"Parsed configuration data: {config_data}")
+            # If data is a string, try to decode it
+            if isinstance(data, str):
+                import base64
+                import json
+                try:
+                    # Try to decode from base64 if it's encoded that way
+                    decoded_data = base64.b64decode(data).decode('utf-8')
+                    data_json = json.loads(decoded_data)
+                except:
+                    # If not base64 encoded, try direct JSON parsing
+                    data_json = json.loads(data)
+                
+                if 'stationName' in data_json:
+                    station_name = data_json['stationName']
+                    logger.info(f"Station name set to: {station_name}")
+            # If data is already a dictionary
+            elif isinstance(data, dict) and 'stationName' in data:
+                station_name = data['stationName']
+                logger.info(f"Station name set to: {station_name}")
         except Exception as e:
-            logger.error(f"Error parsing data parameter: {e}")
+            logger.error(f"Error extracting station name from data: {e}")
     
     transport = DailyTransport(
         room_url=room_url,
@@ -210,30 +222,45 @@ async def run_bot(room_url, token, identifier, data=None):
             buffer_size_secs=0.5
         )
 
+    # Set a default TTS if not configured through data
     tts = None
-    if config_data.get("tts"):
-        if config_data["tts"]["provider"] == "cartesia":
+    if data and isinstance(data, dict) and 'tts' in data:
+        if data['tts']['provider'] == "cartesia":
             tts = CartesiaTTSService(
                 api_key=os.getenv("CARTESIA_API_KEY"),
-                voice_id=config_data["tts"]["voiceId"],  
-                model=config_data["tts"]["model"],
+                voice_id=data['tts']['voiceId'],  
+                model=data['tts']['model'],
                 params=CartesiaTTSService.InputParams(
                     language=Language.EN,
-                    speed=config_data["tts"]["speed"],
-                    emotion=config_data["tts"]["emotion"]
+                    speed=data['tts']['speed'],
+                    emotion=data['tts']['emotion']
                 )
             )
-        elif config_data["tts"]["provider"] == "elevenlabs":
+        elif data['tts']['provider'] == "elevenlabs":
             tts = ElevenLabsTTSService(
                 api_key=os.getenv("ELEVENLABS_API_KEY"),
-                voice_id=config_data["tts"]["voiceId"], 
+                voice_id=data['tts']['voiceId'], 
                 params=ElevenLabsTTSService.InputParams(
-                    stability=config_data["tts"]["stability"],
-                    similarity_boost=config_data["tts"]["similarity_boost"],
-                    style=config_data["tts"]["style"],
-                    user_speaker_boost=config_data["tts"]["user_speaker_boost"]
+                    stability=data['tts']['stability'],
+                    similarity_boost=data['tts']['similarity_boost'],
+                    style=data['tts']['style'],
+                    user_speaker_boost=data['tts']['user_speaker_boost']
                 ) 
             )
+    
+    # Ensure TTS is not None by setting a default if needed
+    if tts is None:
+        logger.info("No TTS configuration found, using default CartesiaTTSService")
+        tts = CartesiaTTSService(
+            api_key=os.getenv("CARTESIA_API_KEY"),
+            voice_id="ec58877e-44ae-4581-9078-a04225d42bd4", # Default voice
+            model="sonic-2-2025-03-07",
+            params=CartesiaTTSService.InputParams(
+                language=Language.EN,
+                speed="slow",
+                emotion=None
+            )
+        )
 
     messages = [
         {
@@ -252,7 +279,7 @@ async def run_bot(room_url, token, identifier, data=None):
     )
 
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
-    await status_updater.initialize(rtvi, identifier, room_url)
+    await status_updater.initialize(rtvi, identifier, room_url, station_name)
     hume_observer = HumeOfflineWebSocketObserver(api_key=os.getenv("HUME_API_KEY"), rtvi=rtvi)
     conversation_pipeline = Pipeline(
         [
@@ -425,8 +452,8 @@ async def run_bot(room_url, token, identifier, data=None):
         
         try:
             # Update status updater with the participant ID
-            await status_updater.initialize(rtvi, identifier, room_url)
-            logger.info(f"StatusUpdater initialized with identifier: {identifier}")
+            await status_updater.initialize(rtvi, identifier, room_url, station_name)
+            logger.info(f"StatusUpdater initialized with identifier: {identifier} and station name: {station_name}")
             
             # Start transcription for the user
             await transport.capture_participant_transcription(participant_id)

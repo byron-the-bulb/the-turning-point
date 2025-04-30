@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help Status Monitor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .help-panel {
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            transition: background-color 0.5s ease;
+        }
+        .no-help {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .needs-help {
+            background-color: #f8d7da;
+            color: #721c24;
+            animation: flash 1s infinite alternate;
+        }
+        @keyframes flash {
+            from { opacity: 1; }
+            to { opacity: 0.7; }
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .help-button {
+            background-color: #dc3545;
+            color: white;
+        }
+        .resolve-button {
+            background-color: #28a745;
+            color: white;
+        }
+        .help-history {
+            background-color: white;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .history-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .timestamp {
+            color: #666;
+            font-size: 0.8em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Help Status Monitor</h1>
+        
+        <div id="helpPanel" class="help-panel no-help">
+            No help needed
+        </div>
+        
+        <div class="controls">
+            <button id="testHelpButton" class="help-button">Test Help Request</button>
+            <button id="resolveButton" class="resolve-button">Resolve Help Request</button>
+        </div>
+        
+        <div class="help-history">
+            <h2>Help Request History</h2>
+            <div id="historyContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const helpPanel = document.getElementById('helpPanel');
+        const testHelpButton = document.getElementById('testHelpButton');
+        const resolveButton = document.getElementById('resolveButton');
+        const historyContainer = document.getElementById('historyContainer');
+        
+        // Current help state
+        let currentHelpState = {
+            help_needed: false,
+            help_user: ''
+        };
+        
+        // Update the UI based on help status
+        function updateHelpUI(helpState) {
+            currentHelpState = helpState;
+            
+            if (helpState.help_needed) {
+                helpPanel.textContent = `${helpState.help_user} NEEDS HELP`;
+                helpPanel.className = 'help-panel needs-help';
+            } else {
+                helpPanel.textContent = 'No help needed';
+                helpPanel.className = 'help-panel no-help';
+            }
+        }
+        
+        // Add entry to history
+        function addHistoryEntry(message) {
+            const entry = document.createElement('div');
+            entry.className = 'history-item';
+            
+            const timestamp = new Date().toLocaleTimeString();
+            entry.innerHTML = `
+                <span class="timestamp">[${timestamp}]</span> ${message}
+            `;
+            
+            historyContainer.prepend(entry);
+        }
+        
+        // Fetch help status
+        async function fetchHelpStatus() {
+            try {
+                const response = await fetch('/help_status');
+                const data = await response.json();
+                updateHelpUI(data);
+            } catch (error) {
+                console.error('Error fetching help status:', error);
+            }
+        }
+        
+        // Send help request
+        async function sendHelpRequest(user, needsHelp) {
+            try {
+                const response = await fetch('/needs_help', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user: user,
+                        needs_help: needsHelp
+                    })
+                });
+                
+                const data = await response.json();
+                updateHelpUI(data);
+                
+                const message = needsHelp 
+                    ? `Help requested for: ${user}`
+                    : `Help resolved for: ${currentHelpState.help_user}`;
+                addHistoryEntry(message);
+                
+                return data;
+            } catch (error) {
+                console.error('Error sending help request:', error);
+            }
+        }
+        
+        // Event listeners
+        testHelpButton.addEventListener('click', () => {
+            const user = prompt('Enter user or stage name:') || 'Test User';
+            sendHelpRequest(user, true);
+        });
+        
+        resolveButton.addEventListener('click', () => {
+            if (currentHelpState.help_needed) {
+                sendHelpRequest(currentHelpState.help_user, false);
+            } else {
+                alert('No active help requests to resolve');
+            }
+        });
+        
+        // Initialize
+        fetchHelpStatus();
+        
+        // Poll for updates every 5 seconds
+        setInterval(fetchHelpStatus, 5000);
+    </script>
+</body>
+</html> 

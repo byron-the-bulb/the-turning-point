@@ -614,6 +614,19 @@ def create_goodbye_node()->NodeConfig:
 
 
 async def call_greeting_guide_assistance(args: FlowArgs) -> FlowResult:
+    # Import at function level to avoid circular imports
+    from status_utils import status_updater
+    logger.info(f"[DEBUG] call_greeting_guide_assistance called with args: {args}")
+    
+    try:
+        logger.info(f"[DEBUG] About to call status_updater.needs_help('Greeting', True)")
+        await status_updater.needs_help("Greeting", True)
+        logger.info(f"[DEBUG] Successfully called status_updater.needs_help")
+    except Exception as e:
+        import traceback
+        logger.error(f"[DEBUG] Error in call_greeting_guide_assistance: {e}")
+        logger.error(f"[DEBUG] Traceback: {traceback.format_exc()}")
+    
     return {"status": "success", "call_guide_assistance": True}
 
 async def call_greeting_guide_assistance_callback(
@@ -626,6 +639,19 @@ async def call_greeting_guide_assistance_callback(
         await flow_manager.set_node("guide_assistance", create_greeting_guide_assistance_node())
 
 async def call_name_guide_assistance(args: FlowArgs) -> FlowResult:
+    # Import at function level to avoid circular imports
+    from status_utils import status_updater
+    logger.info(f"[DEBUG] call_name_guide_assistance called with args: {args}")
+    
+    try:
+        logger.info(f"[DEBUG] About to call status_updater.needs_help('Name collection', True)")
+        await status_updater.needs_help("Name collection", True)
+        logger.info(f"[DEBUG] Successfully called status_updater.needs_help")
+    except Exception as e:
+        import traceback
+        logger.error(f"[DEBUG] Error in call_name_guide_assistance: {e}")
+        logger.error(f"[DEBUG] Traceback: {traceback.format_exc()}")
+    
     return {"status": "success", "call_guide_assistance": True}
 
 async def call_name_guide_assistance_callback(
@@ -638,6 +664,19 @@ async def call_name_guide_assistance_callback(
         await flow_manager.set_node("name_guide_assistance", create_name_guide_assistance_node())
 
 async def call_challenge_guide_assistance(args: FlowArgs) -> FlowResult:
+    # Import at function level to avoid circular imports
+    from status_utils import status_updater
+    logger.info(f"[DEBUG] call_challenge_guide_assistance called with args: {args}")
+    
+    try:
+        logger.info(f"[DEBUG] About to call status_updater.needs_help('Challenge selection', True)")
+        await status_updater.needs_help("Challenge selection", True)
+        logger.info(f"[DEBUG] Successfully called status_updater.needs_help")
+    except Exception as e:
+        import traceback
+        logger.error(f"[DEBUG] Error in call_challenge_guide_assistance: {e}")
+        logger.error(f"[DEBUG] Traceback: {traceback.format_exc()}")
+    
     return {"status": "success", "call_guide_assistance": True}
 
 async def call_challenge_guide_assistance_callback(
@@ -650,6 +689,19 @@ async def call_challenge_guide_assistance_callback(
         await flow_manager.set_node("challenge_guide_assistance", create_challenge_guide_assistance_node())
 
 async def call_empowered_state_guide_assistance(args: FlowArgs) -> FlowResult:
+    # Import at function level to avoid circular imports
+    from status_utils import status_updater
+    logger.info(f"[DEBUG] call_empowered_state_guide_assistance called with args: {args}")
+    
+    try:
+        logger.info(f"[DEBUG] About to call status_updater.needs_help('Empowered state selection', True)")
+        await status_updater.needs_help("Empowered state selection", True)
+        logger.info(f"[DEBUG] Successfully called status_updater.needs_help")
+    except Exception as e:
+        import traceback
+        logger.error(f"[DEBUG] Error in call_empowered_state_guide_assistance: {e}")
+        logger.error(f"[DEBUG] Traceback: {traceback.format_exc()}")
+    
     return {"status": "success", "call_guide_assistance": True}
 
 async def call_empowered_state_guide_assistance_callback(
@@ -661,9 +713,22 @@ async def call_empowered_state_guide_assistance_callback(
     if result["status"] == "success":
         await flow_manager.set_node("empowered_state_guide_assistance", create_empowered_state_guide_assistance_node())
 
-
 async def guide_greeting_assistance_handler(args: FlowArgs) -> FlowResult:
     logger.info(f"[Flow]guide_greeting_assistance_handler called")
+    
+    # Import status_updater here to avoid circular imports
+    from status_utils import status_updater
+    
+    try:
+        logger.info(f"[DEBUG] About to call status_updater.needs_help('Greeting', True) from guide_greeting_assistance_handler")
+        # This is the actual call that sends the help request to Resolume
+        await status_updater.needs_help("Greeting", True)
+        logger.info(f"[DEBUG] Successfully called status_updater.needs_help from guide_greeting_assistance_handler")
+    except Exception as e:
+        import traceback
+        logger.error(f"[DEBUG] Error in guide_greeting_assistance_handler: {e}")
+        logger.error(f"[DEBUG] Traceback: {traceback.format_exc()}")
+    
     return {"status": "success", "call_guide_assistance": True}
 
 async def guide_greeting_assistance_callback(
@@ -823,6 +888,20 @@ Available Empowered States for your challenge: {', '.join(CHALLENGE_TO_EMPOWERED
 
 async def greeting_guide_response_handler(args: FlowArgs) -> FlowResult:
     is_ready = args.get("is_ready", False)
+    # Import at function level to avoid circular imports
+    from status_utils import status_updater
+    logger.info(f"[DEBUG] greeting_guide_response_handler called with args: {args}")
+    
+    try:
+        logger.info(f"[DEBUG] About to call status_updater.needs_help('Greeting', False)")
+        # Turn off help request since guide has responded
+        await status_updater.needs_help("Greeting", False)
+        logger.info(f"[DEBUG] Successfully turned off help request")
+    except Exception as e:
+        import traceback
+        logger.error(f"[DEBUG] Error in greeting_guide_response_handler: {e}")
+        logger.error(f"[DEBUG] Traceback: {traceback.format_exc()}")
+    
     return {"status": "success", "is_ready": is_ready}
 
 async def greeting_guide_response_callback(
@@ -838,6 +917,8 @@ async def greeting_guide_response_callback(
 
 async def name_guide_response_handler(args: FlowArgs) -> FlowResult:
     user_name = args.get("user_name", "").strip()
+    # Turn off help request since guide has responded
+    await status_updater.needs_help("Name collection", False)
     return {"status": "success", "user_name": user_name}
 
 async def name_guide_response_callback(
@@ -852,6 +933,8 @@ async def name_guide_response_callback(
 
 async def challenge_guide_response_handler(args: FlowArgs) -> FlowResult:
     challenge = args.get("challenge", "").lower()
+    # Turn off help request since guide has responded
+    await status_updater.needs_help("Challenge selection", False)
     return {"status": "success", "challenge": challenge}
 
 async def challenge_guide_response_callback(
@@ -864,6 +947,8 @@ async def challenge_guide_response_callback(
 
 async def empowered_state_guide_response_handler(args: FlowArgs) -> FlowResult:
     empowered_state = args.get("empowered_state", "").lower()
+    # Turn off help request since guide has responded
+    await status_updater.needs_help("Empowered state selection", False)
     return {"status": "success", "empowered_state": empowered_state}
 
 async def empowered_state_guide_response_callback(

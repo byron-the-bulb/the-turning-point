@@ -111,11 +111,68 @@
             background-color: #f2dede;
             color: #a94442;
         }
+        /* Help notification styles */
+        .help-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .help-needed {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+            animation: flash 1s infinite alternate;
+        }
+        @keyframes flash {
+            from { opacity: 1; }
+            to { opacity: 0.8; }
+        }
+        .help-controls {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .help-button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .resolve-button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <h1>Turning Point Video Controller</h1>
     
+    <!-- Help notification panel -->
+    <div id="helpNotification" class="help-notification help-needed">
+        <span id="helpMessage"></span>
+        <div class="help-controls">
+            <button id="resolveHelpButton" class="resolve-button">Resolve</button>
+        </div>
+    </div>
+    
+    <div class="help-controls" style="margin-bottom: 20px;">
+        <button id="testHelpButton" class="help-button">Test Help Request</button>
+    </div>
+
     <div class="container">
         <div class="queue" id="queue">
             <h2>Waiting Burners</h2>
@@ -166,6 +223,100 @@
             };
             slotsContainer.appendChild(slot);
         }
+
+        // Help notification functionality
+        const helpNotification = document.getElementById('helpNotification');
+        const helpMessage = document.getElementById('helpMessage');
+        const testHelpButton = document.getElementById('testHelpButton');
+        const resolveHelpButton = document.getElementById('resolveHelpButton');
+        
+        // Current help state
+        let currentHelpState = {
+            help_needed: false,
+            help_user: ''
+        };
+        
+        // Update the help notification UI
+        function updateHelpUI(helpState) {
+            currentHelpState = helpState;
+            
+            if (helpState.help_needed) {
+                helpMessage.textContent = `${helpState.help_user} NEEDS HELP`;
+                helpNotification.style.display = 'block';
+            } else {
+                helpNotification.style.display = 'none';
+            }
+        }
+        
+        // Fetch help status
+        async function fetchHelpStatus() {
+            try {
+                const response = await fetch('/help_status');
+                const data = await response.json();
+                updateHelpUI(data);
+            } catch (error) {
+                console.error('Error fetching help status:', error);
+            }
+        }
+        
+        // Send help request
+        async function sendHelpRequest(user, needsHelp) {
+            try {
+                const response = await fetch('/needs_help', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user: user,
+                        needs_help: needsHelp
+                    })
+                });
+                
+                const data = await response.json();
+                updateHelpUI(data);
+                
+                // Update status message
+                const status = document.getElementById('status');
+                status.style.display = 'block';
+                
+                if (needsHelp) {
+                    status.className = 'status error';
+                    status.textContent = `Help requested for: ${user}`;
+                } else {
+                    status.className = 'status success';
+                    status.textContent = `Help resolved for: ${user}`;
+                }
+                
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 3000);
+                
+                return data;
+            } catch (error) {
+                console.error('Error sending help request:', error);
+                // Show error in status
+                const status = document.getElementById('status');
+                status.style.display = 'block';
+                status.className = 'status error';
+                status.textContent = `Error: ${error.message}`;
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 3000);
+            }
+        }
+        
+        // Event listeners for help buttons
+        testHelpButton.addEventListener('click', () => {
+            const user = prompt('Enter user or stage name:') || 'Test User';
+            sendHelpRequest(user, true);
+        });
+        
+        resolveHelpButton.addEventListener('click', () => {
+            if (currentHelpState.help_needed) {
+                sendHelpRequest(currentHelpState.help_user, false);
+            }
+        });
 
         function findFirstEmptySlot() {
             const slots = document.querySelectorAll('.slot');
@@ -332,8 +483,15 @@
             });
         }
 
-        // Update queue every 5 seconds
-        setInterval(updateQueue, 5000);
+        // Initialize help status
+        fetchHelpStatus();
+        
+        // Update queue and help status every 5 seconds
+        setInterval(() => {
+            updateQueue();
+            fetchHelpStatus();
+        }, 5000);
+        
         // Initial update
         updateQueue();
     </script>
