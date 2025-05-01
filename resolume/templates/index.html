@@ -407,21 +407,35 @@
                 const item = slot.querySelector('.queue-item');
                 if (!item) return null;
                 
-                const text = item.textContent.trim();
-                const [name, rest] = text.split(' - ');
-                const [challenge_point, envi_state] = rest.split(' to ');
-                
-                const videoData = {
-                    index: index,
-                    name: name.trim(),
-                    challenge_point: challenge_point.trim(),
-                    envi_state: envi_state.trim(),
-                    video: item.dataset.video,
-                    channel: parseInt(item.dataset.channel)
-                };
-                
-                console.log('Video data:', videoData);  // Debug log
-                return videoData;
+                try {
+                    const text = item.textContent.trim();
+                    // Check if the text contains the expected delimiters
+                    const parts = text.split(' - ');
+                    const name = parts[0].trim();
+                    
+                    let challenge_point = '', envi_state = '';
+                    if (parts.length > 1) {
+                        const rest = parts[1];
+                        const envParts = rest.split(' to ');
+                        challenge_point = envParts[0].trim();
+                        envi_state = envParts.length > 1 ? envParts[1].trim() : '';
+                    }
+                    
+                    const videoData = {
+                        index: index,
+                        name: name,
+                        challenge_point: challenge_point,
+                        envi_state: envi_state,
+                        video: item.dataset.video,
+                        channel: parseInt(item.dataset.channel)
+                    };
+                    
+                    console.log('Video data:', videoData);  // Debug log
+                    return videoData;
+                } catch (error) {
+                    console.error('Error parsing video data:', error);
+                    return null;
+                }
             }).filter(v => v !== null);
 
             if (videos.length === 0) {
