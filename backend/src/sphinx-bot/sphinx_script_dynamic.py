@@ -44,7 +44,7 @@ CHALLENGE_TO_EMPOWERED_STATES = {
 
 FLOW_STATES = {
     "greeting": {
-        "task": """Welcome the participant with a guided meditation, and wait for them to indicate readiness. 
+        "task": """Welcome the participant with a guided meditation, and wait for them to indicate readiness, then call the function check_for_ready. 
         
         IMPORTANT RULES:
         1. You have EXACTLY 2 attempts to understand if the participant is ready.
@@ -124,9 +124,7 @@ FLOW_STATES = {
    
 
 async def greeting_ready_handler(args: FlowArgs, flow_manager: FlowManager) -> FlowResult:
-    user_ready = args.get("user_ready", "")
-    logger.info(f"[Flow]greeting_ready_handler: user_ready={user_ready}")
-    return {"status": "success", "user_ready": user_ready}
+    return {"status": "success", "user_ready": True}
 
 
 async def greeting_callback(

@@ -198,7 +198,8 @@ async def run_bot(room_url, token, identifier, data=None):
         stt = WhisperSTTService(
             api_key=os.getenv("OPENAI_API_KEY"),
             device=sphinx_whisper_device,
-            model=model_path  # Pass the model path directly to the model parameter
+            model=model_path,
+            no_speech_prob=0.2
         )
     else:
         logger.info("Using default Whisper model configuration")
@@ -206,8 +207,7 @@ async def run_bot(room_url, token, identifier, data=None):
             api_key=os.getenv("OPENAI_API_KEY"),
             device=sphinx_whisper_device,
             model=Model.DISTIL_MEDIUM_EN,
-            no_speech_prob=0.2,
-            buffer_size_secs=0.5
+            no_speech_prob=0.2
         )
 
     tts = None

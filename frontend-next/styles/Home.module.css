@@ -127,3 +127,15 @@
   border-radius: 0.25rem;
   font-size: 1rem;
 }
+
+.audioControls {
+  width: 100%;
+  max-width: 800px;
+  margin: 10px 0;
+  padding: 10px;
+  background-color: rgba(241, 237, 233, 0.7);
+  border-radius: 8px;
+  border: 1px solid #eee;
+  display: flex;
+  justify-content: center;
+}

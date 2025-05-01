@@ -11,6 +11,8 @@ import VoiceSelector from '@/components/VoiceSelector';
 import VoiceSettingsPanel from '@/components/VoiceSettingsPanel';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmotionTracker, { EmotionData } from '@/components/EmotionTracker';
+import AudioDeviceSelector from '@/components/AudioDeviceSelector';
+import { useRTVIClientMediaDevices } from "@pipecat-ai/client-react";
 
 // Import types
 import { TTSConfig } from '@/types';
@@ -34,18 +36,20 @@ const defaultTtsConfig: TTSConfig = {
   emotion: null
 };
 
-// Define an interface that extends TTSConfig to include stationName
+// Define an interface that extends TTSConfig to include stationName and deviceId
 interface ClientConfig extends TTSConfig {
   stationName?: string;
+  audioDeviceId?: string;
 }
 
 // Function to create a Pipecat client with the given TTS configuration
 const createClient = (config: ClientConfig = defaultTtsConfig) => {
   try {
-    // Extract TTS config and station name
-    const { stationName, ...ttsConfig } = config;
+    // Extract TTS config, station name, and audio device ID
+    const { stationName, audioDeviceId, ...ttsConfig } = config;
     
-    return new RTVIClient({
+    // Create client with basic configuration
+    const client = new RTVIClient({
       params: {
         baseUrl: API_URL,
         requestData: {
@@ -57,6 +61,15 @@ const createClient = (config: ClientConfig = defaultTtsConfig) => {
       transport: new DailyTransport(),
       enableMic: true
     });
+    
+    // Log the selected audio device for debugging purposes
+    if (audioDeviceId) {
+      console.log('Selected audio device ID:', audioDeviceId);
+      // Note: The actual device selection happens in the AudioDeviceSelector component
+      // when it's rendered within the RTVIClientProvider
+    }
+    
+    return client;
   } catch (error) {
     console.error('Failed to initialize Pipecat client:', error);
     return null;
@@ -86,12 +99,19 @@ export default function Home() {
   const [isWaitingForParticipant, setIsWaitingForParticipant] = useState(false);
   const [emotionData, setEmotionData] = useState<EmotionData | null>(null);
   const [stationName, setStationName] = useState('Station 1'); // Default station name
+  const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState<string | undefined>();
   const eventHandlersAttached = useRef(false);
   const initialMessageSent = useRef(false);
 
   // Handle station name change
   const handleStationNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setStationName(e.target.value);
+  };
+
+  // Handle audio device selection
+  const handleAudioDeviceSelect = (deviceId: string) => {
+    console.log('Audio device selected:', deviceId);
+    setSelectedAudioDeviceId(deviceId);
   };
 
   // Custom setter to log all updates to pendingUIOverride
@@ -414,14 +434,15 @@ export default function Home() {
   }, [addChatMessage, logSetPendingUIOverride]);
 
   const handleStartConnection = useCallback(() => {
-    console.log('Starting connection with TTS config:', ttsConfig, 'and station name:', stationName);
+    console.log('Starting connection with TTS config:', ttsConfig, 'station name:', stationName, 'and audio device:', selectedAudioDeviceId);
     setStatusText('Starting connection...');
     setIsConnecting(true);
 
-    // Create a new client with the current TTS configuration and station name
+    // Create a new client with the current TTS configuration, station name, and audio device
     clientInstance = createClient({
       ...ttsConfig,
-      stationName // Add station name to the configuration
+      stationName, // Add station name to the configuration
+      audioDeviceId: selectedAudioDeviceId // Add selected audio device ID
     });
 
     if (!clientInstance) {
@@ -448,7 +469,7 @@ export default function Home() {
       // Clean up client
       clientInstance = null;
     });
-  }, [ttsConfig, setupEventHandlers, stationName]); // Add stationName to dependencies
+  }, [ttsConfig, setupEventHandlers, stationName, selectedAudioDeviceId]); // Add selectedAudioDeviceId to dependencies
 
   const handleStopConnection = useCallback(() => {
     if (!clientInstance) return;
@@ -513,6 +534,15 @@ export default function Home() {
             disabled={isConnected || isConnecting} // Disable when connected
           />
         </div>
+        
+        {/* Audio Device Selector - available before connection */}
+        <div className={styles.audioControls}>
+          <AudioDeviceSelector 
+            insideProvider={false}
+            selectedDeviceId={selectedAudioDeviceId}
+            onDeviceSelect={handleAudioDeviceSelect}
+          />
+        </div>
 
         {participantId ? (
           <>
@@ -548,6 +578,13 @@ export default function Home() {
 
         {clientInstance ? (
           <RTVIClientProvider client={clientInstance}>
+            {/* Show the internal audio selector when connected */}
+            <div className={styles.audioControls}>
+              <AudioDeviceSelector 
+                insideProvider={true} 
+                selectedDeviceId={selectedAudioDeviceId} 
+              />
+            </div>
             <RTVIClientAudio />
             <ChatLog
               messages={chatMessages}
