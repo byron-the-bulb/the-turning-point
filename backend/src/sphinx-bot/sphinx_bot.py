@@ -42,7 +42,7 @@ from pipecat.transports.services.daily import DailyTransport, DailyParams
 from pipecat.services.whisper.stt import WhisperSTTService, Model
 from pipecat.processors.frameworks.rtvi import RTVIProcessor, RTVIConfig, RTVIObserver, RTVIMessage, RTVIAction, RTVIActionArgument,RTVIServerMessageFrame
 from pipecat_flows import FlowManager
-from sphinx_script_dynamic import create_identify_empowered_state_node, create_initial_node
+from sphinx_script_dynamic import SYSTEM_ROLE, create_identify_empowered_state_node, create_initial_node
 from status_utils import status_updater
 from custom_flow_manager import CustomFlowManager
 from pipecat.processors.frame_processor import FrameDirection
@@ -107,40 +107,28 @@ async def run_bot(room_url, token, identifier, data=None):
     """Run the Sphinx voice bot with the provided room URL and token.
     
     Args:
-        room_url: The URL of the Daily room to join.
-        token: The token to use for authentication with Daily.
-        identifier: Unique identifier for this bot instance.
-        data: Optional JSON-encoded data passed from the server.
+        room_url: The URL of the Daily room to connect to
+        token: The access token for the Daily room
+        identifier: A unique identifier for this bot instance
+        data: Optional JSON-encoded data passed from the server
     """
-    logger.info(f"Starting Sphinx bot with room URL: {room_url}, token: {token[:8]}..., identifier: {identifier}")
+    logger.info(f"Starting Sphinx bot in room {room_url} with identifier {identifier}")
     
-    # Default station name
-    station_name = "Unknown Station"
-    
-    # Extract station name from data if available
+    # print all env variables
+    #logger.info(f"All environment variables: {dict(os.environ)}")
+    # Parse the data if provided
+    logger.info(f"Received data: {data}")
+    config_data = {}
     if data:
         try:
-            # If data is a string, try to decode it
-            if isinstance(data, str):
-                import base64
-                import json
-                try:
-                    # Try to decode from base64 if it's encoded that way
-                    decoded_data = base64.b64decode(data).decode('utf-8')
-                    data_json = json.loads(decoded_data)
-                except:
-                    # If not base64 encoded, try direct JSON parsing
-                    data_json = json.loads(data)
-                
-                if 'stationName' in data_json:
-                    station_name = data_json['stationName']
-                    logger.info(f"Station name set to: {station_name}")
-            # If data is already a dictionary
-            elif isinstance(data, dict) and 'stationName' in data:
-                station_name = data['stationName']
-                logger.info(f"Station name set to: {station_name}")
+
+            # Decode base64-encoded JSON data
+            decoded_data = base64.b64decode(data).decode()
+            logger.info(f"Decoded data: {decoded_data}")
+            config_data = json.loads(decoded_data)
+            logger.info(f"Parsed configuration data: {config_data}")
         except Exception as e:
-            logger.error(f"Error extracting station name from data: {e}")
+            logger.error(f"Error parsing data parameter: {e}")
     
     transport = DailyTransport(
         room_url=room_url,
@@ -222,52 +210,42 @@ async def run_bot(room_url, token, identifier, data=None):
             buffer_size_secs=0.5
         )
 
-    # Set a default TTS if not configured through data
     tts = None
-    if data and isinstance(data, dict) and 'tts' in data:
-        if data['tts']['provider'] == "cartesia":
+    if config_data.get("tts"):
+        if config_data["tts"]["provider"] == "cartesia":
             tts = CartesiaTTSService(
                 api_key=os.getenv("CARTESIA_API_KEY"),
-                voice_id=data['tts']['voiceId'],  
-                model=data['tts']['model'],
+                voice_id=config_data["tts"]["voiceId"],  
+                model=config_data["tts"]["model"],
                 params=CartesiaTTSService.InputParams(
                     language=Language.EN,
-                    speed=data['tts']['speed'],
-                    emotion=data['tts']['emotion']
+                    speed=config_data["tts"]["speed"],
+                    emotion=config_data["tts"]["emotion"]
                 )
             )
-        elif data['tts']['provider'] == "elevenlabs":
+        elif config_data["tts"]["provider"] == "elevenlabs":
             tts = ElevenLabsTTSService(
                 api_key=os.getenv("ELEVENLABS_API_KEY"),
-                voice_id=data['tts']['voiceId'], 
+                voice_id=config_data["tts"]["voiceId"], 
                 params=ElevenLabsTTSService.InputParams(
-                    stability=data['tts']['stability'],
-                    similarity_boost=data['tts']['similarity_boost'],
-                    style=data['tts']['style'],
-                    user_speaker_boost=data['tts']['user_speaker_boost']
+                    stability=config_data["tts"]["stability"],
+                    similarity_boost=config_data["tts"]["similarity_boost"],
+                    style=config_data["tts"]["style"],
+                    user_speaker_boost=config_data["tts"]["user_speaker_boost"]
                 ) 
             )
-    
-    # Ensure TTS is not None by setting a default if needed
-    if tts is None:
-        logger.info("No TTS configuration found, using default CartesiaTTSService")
-        tts = CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="ec58877e-44ae-4581-9078-a04225d42bd4", # Default voice
-            model="sonic-2-2025-03-07",
-            params=CartesiaTTSService.InputParams(
-                language=Language.EN,
-                speed="slow",
-                emotion=None
-            )
-        )
 
     messages = [
         {
             "role": "system",
-            "content": "You are Sphinx, a wise, helpful and friendly voice assistant. Keep your responses concise and conversational. Speak slowly and calmly. Always call the provided functions, never skip.",
+            "content": SYSTEM_ROLE,
         },
     ]
+
+    if config_data.get("stationName"):
+        station_name = config_data["stationName"]
+    else:
+        station_name = "Unknown Station"
 
     context = OpenAILLMContext(messages)
     context_aggregator = llm.create_context_aggregator(context)
@@ -453,7 +431,7 @@ async def run_bot(room_url, token, identifier, data=None):
         try:
             # Update status updater with the participant ID
             await status_updater.initialize(rtvi, identifier, room_url, station_name)
-            logger.info(f"StatusUpdater initialized with identifier: {identifier} and station name: {station_name}")
+            logger.info(f"StatusUpdater initialized with identifier: {identifier}")
             
             # Start transcription for the user
             await transport.capture_participant_transcription(participant_id)
