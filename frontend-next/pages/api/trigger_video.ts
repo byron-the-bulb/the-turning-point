@@ -41,8 +41,8 @@ export default async function handler(
 
     // Prepare payload for resolume_control server
     const payload: ResolumeVideoRequest = {
-      name: '', // Leave empty for now as requested
-      challenge_point: '',  // Not specified in requirements, leaving empty
+      name: empowered_state_data.user_name || '', // Leave empty for now as requested
+      challenge_point: empowered_state_data.challenge || '',  // Not specified in requirements, leaving empty
       envi_state: empowered_state_data.empowered_state, // As specified in requirements
       emotions: empowered_state_data.combined_emotions
     };
