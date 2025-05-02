@@ -175,7 +175,7 @@ def set_text_overlay(text: str, layer: int):
             message = f"/composition/video/effects/textblock/effect/text/params/lines"
         elif layer == 2:
             # Updated addressing for square/layer 2 - use group 1 addressing
-            message = f"/composition/groups/1/video/effects/textblock/effect/text/params/lines"
+            message = f"/composition/groups/2/video/effects/textblock/effect/text/params/lines"
         else:
             # For layers 3 and above, they correspond to group numbers
             message = f"/composition/groups/{layer}/video/effects/textblock/effect/text/params/lines"
