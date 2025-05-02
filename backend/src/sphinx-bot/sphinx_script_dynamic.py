@@ -270,9 +270,9 @@ def create_collect_name_node(custom_prompt: str = None)->NodeConfig:
             )
         ],
         "ui_override": {
-            "type": "text_input",
-            "prompt": "Enter your name",
-            "placeholder": "Type your name here"
+            "type": "button",
+            "prompt": "Use Seeker as user name.",
+            "action_text": "My name is Seeker."
         }
     }
 
