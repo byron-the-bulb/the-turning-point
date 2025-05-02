@@ -356,7 +356,7 @@ async def play_video_sequence(videos):
     Handle the sequence of video playback in a background task
     
     Timing:
-    1. Play intro video in layer 1 for 1m7s (67 seconds)
+    1. Play intro video in layer 1 for 1m7s (120 seconds)
     2. Then play queued videos one by one in layer 2, each for 28 seconds
     3. After each video plays in layer 2, move it to the first available layer (3-8)
     4. After all videos have played, keep them running in layers 3-8 for 30 more seconds
@@ -367,11 +367,11 @@ async def play_video_sequence(videos):
         # Trigger the intro video in layer 1, clip 2
         client.send_message("/composition/layers/1/clips/2/connect", 1)  
         
-        # STEP 2: Wait for 1m7s (67 seconds) before starting first queued video
-        print(f"Waiting 1m7s (67 seconds) for intro video...")
+        # STEP 2: Wait for 1m7s (120 seconds) before starting first queued video
+        print(f"Waiting 1m7s (120 seconds) for intro video...")
         
-        # Check for cancellation during the 67-second wait
-        for _ in range(67):
+        # Check for cancellation during the 120-second wait
+        for _ in range(120):
             # Check if task was cancelled
             if asyncio.current_task().cancelled():
                 print("Play sequence task was cancelled - stopping")
@@ -717,6 +717,39 @@ async def restart_turning_point():
         }
     except Exception as e:
         print(f"Error restarting: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/start-final-sequence")
+async def start_final_sequence():
+    """
+    Start the final sequence of the Turning Point experience:
+    1. Show the ending screen in layer 1
+    2. Clear layer 2
+    3. Keep videos in layers 3-8 running for the final 30 seconds
+    """
+    try:
+        print("Starting final sequence")
+        
+        # For layer 1, show the ending screen which is in column 1
+        print("Showing ending screen in layer 1 (composition) at column 1")
+        client.send_message("/composition/layers/1/clips/1/connect", 1)
+        
+        # Clear layer 2 (square) as its video has finished
+        print("Clearing layer 2 (square) by triggering empty column 1")
+        toggle_layer(2, False)
+        
+        # Clear any text overlay in composition
+        set_text_overlay("", 1)
+        
+        # Let layers 3-8 continue running - they'll be cleared by the frontend
+        # after the 30-second countdown
+        
+        return {
+            "status": "success",
+            "message": "Final sequence started - videos in layers 3-8 will continue for 30 seconds"
+        }
+    except Exception as e:
+        print(f"Error starting final sequence: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

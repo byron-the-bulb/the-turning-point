@@ -364,7 +364,8 @@
             slot.className = 'slot';
             slot.id = `slot-${i}`;
             slot.ondragover = (e) => {
-                // Check if this specific slot is disabled
+                // Only check if this specific slot is disabled
+                // (not whether the turning point is running)
                 if (slot.classList.contains('disabled')) {
                     e.preventDefault();
                     return; // Don't allow drop on disabled slots
@@ -376,7 +377,8 @@
                 slot.classList.remove('dragover');
             };
             slot.ondrop = (e) => {
-                // Check if this specific slot is disabled
+                // Only check if this specific slot is disabled
+                // (not whether the turning point is running)
                 if (slot.classList.contains('disabled')) {
                     e.preventDefault();
                     return; // Don't allow drop on disabled slots
@@ -493,6 +495,8 @@
         function findFirstEmptySlot() {
             const slots = document.querySelectorAll('.slot');
             for (let i = 0; i < slots.length; i++) {
+                // Only care if the specific slot is empty and not disabled
+                // (It's fine if the turning point is running)
                 if (slots[i].children.length === 0 && !slots[i].classList.contains('disabled')) {
                     return slots[i];
                 }
@@ -625,11 +629,6 @@
                 
                 // Only disable play button, keep fill button enabled
                 playAllButton.disabled = true;
-                
-                // Only disable the slots, don't disable the queue
-                document.querySelectorAll('.slot').forEach(slot => {
-                    slot.classList.add('disabled');
-                });
             } else {
                 // Hide playing indicator
                 playingDiv.style.display = 'none';
@@ -776,6 +775,24 @@
                             slot.classList.remove('active-video');
                         });
                         
+                        // Start final sequence - show ending screen in layer 1 while layers 3-8 continue
+                        console.log("Last video finished in layer 2, starting final sequence");
+                        fetch('/start-final-sequence', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            }
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                console.error('Failed to start final sequence');
+                            }
+                            console.log('Final sequence started');
+                        })
+                        .catch(error => {
+                            console.error('Error starting final sequence:', error);
+                        });
+                        
                         // Start the final 30 second countdown
                         startCountdownTimer(30, () => {
                             console.log('Final countdown complete - clearing all slots');
@@ -898,8 +915,8 @@
             // Set turning point to running state
             setTurningPointState(true, "Intro Video");
             
-            // Start intro countdown (67 seconds) and chain to first video when done
-            startCountdownTimer(67, () => playNextVideo(0, videos));
+            // Start intro countdown (120 seconds) and chain to first video when done
+            startCountdownTimer(120, () => playNextVideo(0, videos));
 
             fetch('/play-all', {
                 method: 'POST',
