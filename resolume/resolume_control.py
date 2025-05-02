@@ -98,6 +98,14 @@ class HelpRequest(BaseModel):
     user: str = Field(..., description="The name of the user or stage requiring assistance (e.g., 'Greeting', 'Name collection', etc.)")
     needs_help: bool = Field(..., description="Set to true to request help, false to cancel help request")
 
+class BurnerData(BaseModel):
+    name: str
+    challenge_point: str
+    envi_state: str
+
+class BurnersToRemoveRequest(BaseModel):
+    burners_to_remove: List[BurnerData] = Field(default=[], description="List of burner data to remove from the queue")
+
 # Global variables
 metadata = load_metadata()
 client = create_osc_client()
@@ -148,7 +156,7 @@ def set_text_overlay(text: str, layer: int):
     
     Layer mapping:
     Layer 1: composition 
-    Layer 2: square
+    Layer 2: square/group 1
     Layer 3: Group 3
     Layer 4: Group 4 
     etc.
@@ -162,8 +170,8 @@ def set_text_overlay(text: str, layer: int):
             # Special case for composition layer
             message = f"/composition/video/effects/textblock/effect/text/params/lines"
         elif layer == 2:
-            # Special case for square layer
-            message = f"/composition/square/video/effects/textblock/effect/text/params/lines"
+            # Updated addressing for square/layer 2 - use group 1 addressing
+            message = f"/composition/groups/1/video/effects/textblock/effect/text/params/lines"
         else:
             # For layers 3 and above, they correspond to group numbers
             message = f"/composition/groups/{layer}/video/effects/textblock/effect/text/params/lines"
@@ -285,6 +293,21 @@ async def get_queue():
     Get the current request queue
     """
     return list(request_queue)
+
+@app.post("/clear-queue")
+async def clear_queue():
+    """
+    Clear the entire request queue
+    """
+    global request_queue
+    
+    print("Clearing request queue")
+    request_queue.clear()  # Remove all items from the queue
+    
+    return {
+        "status": "success",
+        "message": "Request queue cleared"
+    }
 
 @app.post("/play-all")
 async def play_all_videos(request: PlayAllRequest):
@@ -494,13 +517,14 @@ async def help_status():
     }
 
 @app.post("/stop-all")
-async def stop_all_videos():
+async def stop_all_videos(request: BurnersToRemoveRequest = None):
     """
     Stop all videos, show splash screen in layer 1 (composition),
     and cancel any running play sequence.
     The frontend will handle clearing the slots.
+    If burner data is provided, remove matching entries from the queue.
     """
-    global current_play_task
+    global current_play_task, request_queue
     
     try:
         print("Stopping all videos and cancelling play sequence")
@@ -536,12 +560,112 @@ async def stop_all_videos():
         # Clear any text overlay in composition
         set_text_overlay("", 1)
         
+        # If burner data to remove was provided, remove matching entries from the queue
+        removed_count = 0
+        if request and request.burners_to_remove:
+            print(f"Removing {len(request.burners_to_remove)} burners from queue")
+            
+            # Create a new queue without the specified burners
+            original_length = len(request_queue)
+            new_queue = deque()
+            
+            for item in request_queue:
+                # Keep the item unless it matches all criteria (name, challenge_point, envi_state)
+                should_keep = True
+                
+                for burner in request.burners_to_remove:
+                    # Check if all fields match
+                    if (item["name"] == burner.name and 
+                        item["challenge_point"] == burner.challenge_point and 
+                        item["envi_state"] == burner.envi_state):
+                        # This is a match, don't keep it
+                        should_keep = False
+                        break
+                
+                if should_keep:
+                    new_queue.append(item)
+            
+            removed_count = original_length - len(new_queue)
+            
+            # Replace the queue with the filtered version
+            request_queue = new_queue
+            print(f"Removed {removed_count} burners from queue")
+        
         return {
             "status": "success",
-            "message": "All videos stopped and play sequence cancelled"
+            "message": "All videos stopped and play sequence cancelled",
+            "removed_burners": removed_count
         }
     except Exception as e:
         print(f"Error stopping videos: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/clear-processed-burners")
+async def clear_processed_burners(request: BurnersToRemoveRequest):
+    """
+    Remove specific burners from the request queue by matching all criteria.
+    This is used when the Turning Point experience naturally completes, to remove 
+    burners that have already gone through the experience.
+    """
+    global request_queue
+    
+    try:
+        if not request.burners_to_remove:
+            return {
+                "status": "success",
+                "message": "No burners to remove",
+                "removed": 0
+            }
+        
+        print(f"Removing {len(request.burners_to_remove)} processed burners from queue")
+        for burner in request.burners_to_remove:
+            print(f"  - Removing burner: {burner.name} ({burner.challenge_point} to {burner.envi_state})")
+        
+        # Debug: Print queue before removal
+        print(f"Queue before removal (size: {len(request_queue)}):")
+        for idx, item in enumerate(request_queue):
+            print(f"  {idx}: {item['name']} ({item['challenge_point']} to {item['envi_state']})")
+        
+        # Create a new queue without the specified burners
+        original_length = len(request_queue)
+        new_queue = deque()
+        
+        for item in request_queue:
+            # Keep the item unless it matches all criteria (name, challenge_point, envi_state)
+            should_keep = True
+            
+            for burner in request.burners_to_remove:
+                # Check if all fields match
+                if (item["name"] == burner.name and 
+                    item["challenge_point"] == burner.challenge_point and 
+                    item["envi_state"] == burner.envi_state):
+                    # This is a match, don't keep it
+                    print(f"  Found match to remove: {item['name']} ({item['challenge_point']} to {item['envi_state']})")
+                    should_keep = False
+                    break
+            
+            if should_keep:
+                new_queue.append(item)
+        
+        removed_count = original_length - len(new_queue)
+        
+        # Replace the queue with the filtered version
+        request_queue = new_queue
+        
+        # Debug: Print queue after removal
+        print(f"Queue after removal (size: {len(request_queue)}):")
+        for idx, item in enumerate(request_queue):
+            print(f"  {idx}: {item['name']} ({item['challenge_point']} to {item['envi_state']})")
+        
+        print(f"Removed {removed_count} burners from queue")
+        
+        return {
+            "status": "success",
+            "message": f"Removed {removed_count} burners from queue",
+            "removed": removed_count
+        }
+    except Exception as e:
+        print(f"Error removing burners: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/restart")

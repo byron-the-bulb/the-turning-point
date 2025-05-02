@@ -336,7 +336,7 @@
                 <!-- 6 slots will be added here -->
             </div>
             <div class="button-container">
-                <button id="play-all-button" class="play-all-button" onclick="playAllVideos()" disabled>
+            <button id="play-all-button" class="play-all-button" onclick="playAllVideos()" disabled>
                     START Turning Point
                 </button>
                 <button id="stop-button" class="stop-button" onclick="stopAllVideos()">
@@ -344,7 +344,7 @@
                 </button>
                 <button id="restart-button" class="restart-button" onclick="restartTurningPoint()">
                     STOP (and keep burners)
-                </button>
+            </button>
             </div>
         </div>
     </div>
@@ -501,21 +501,38 @@
         }
 
         function updateQueue() {
+            // Always update the queue, even when turning point is running
             fetch('/queue')
                 .then(response => response.json())
                 .then(data => {
                     const queueList = document.getElementById('queue-list');
                     const existingItems = new Set();
                     
-                    // Get all existing items
+                    // Track existing burners by their unique combination of attributes rather than by id
+                    const existingBurnerKeys = new Set();
                     document.querySelectorAll('.queue-item').forEach(item => {
+                        if (item.dataset.name && item.dataset.challenge_point && item.dataset.envi_state) {
+                            // Create a unique key for each burner based on their data
+                            const key = `${item.dataset.name}|${item.dataset.challenge_point}|${item.dataset.envi_state}`;
+                            existingBurnerKeys.add(key);
+                        }
                         existingItems.add(item.id);
                     });
                     
-                    // Only add new items
+                    // Check if queue is empty before we add new items
+                    // This is needed to determine if we should auto-fill slots
+                    const queueIsEmpty = queueList.children.length === 0;
+                    
+                    // Add any new items that aren't already displayed
                     data.forEach((item, index) => {
-                        const itemId = `queue-item-${index}`;
-                        if (!existingItems.has(itemId)) {
+                        // Create a unique identifier for this burner
+                        const burnerKey = `${item.name}|${item.challenge_point}|${item.envi_state}`;
+                        
+                        // Only add if this unique burner is not already displayed somewhere
+                        if (!existingBurnerKeys.has(burnerKey)) {
+                            // Create a stable ID that doesn't change when queue order changes
+                            const itemId = `queue-item-${burnerKey.replace(/[^a-zA-Z0-9]/g, '-')}`;
+                            
                             const div = document.createElement('div');
                             div.className = 'queue-item';
                             div.id = itemId;
@@ -528,20 +545,30 @@
                                 }
                                 e.dataTransfer.setData('text/plain', div.id);
                             };
-                            // Store the video and channel information
-                            // Note: The channel number will be automatically adjusted in the backend
-                            // by adding +1 to account for the empty first column in Resolume
+                            // Store all the identifying information
                             div.dataset.video = item.video;
                             div.dataset.channel = item.channel;
+                            div.dataset.name = item.name;
+                            div.dataset.challenge_point = item.challenge_point;
+                            div.dataset.envi_state = item.envi_state;
                             div.innerHTML = `
                                 <strong>${item.name}</strong> - ${item.challenge_point} to ${item.envi_state}
                             `;
                             
-                            // Try to place in first empty slot that's not disabled
-                            const emptySlot = findFirstEmptySlot();
-                            if (emptySlot && !emptySlot.classList.contains('disabled')) {
-                                emptySlot.appendChild(div);
+                            // Only auto-fill slots if:
+                            // 1. Turning point is not running
+                            // 2. Queue was empty before adding this new item (meaning this is a fresh arrival)
+                            // 3. There are empty slots available
+                            if (!isTurningPointRunning && queueIsEmpty) {
+                                // Try to place in first empty slot that's not disabled
+                                const emptySlot = findFirstEmptySlot();
+                                if (emptySlot && !emptySlot.classList.contains('disabled')) {
+                                    emptySlot.appendChild(div);
+                                } else {
+                                    queueList.appendChild(div);
+                                }
                             } else {
+                                // Always add to queue otherwise
                                 queueList.appendChild(div);
                             }
                         }
@@ -589,25 +616,63 @@
             const playingDiv = document.getElementById('turningPointPlaying');
             const currentVideoText = document.getElementById('currentVideoPlaying');
             const playAllButton = document.getElementById('play-all-button');
+            const fillButton = document.getElementById('fill-button');
             
             if (isRunning) {
                 // Show playing indicator
                 playingDiv.style.display = 'block';
                 currentVideoText.textContent = currentVideo;
                 
-                // Disable play button while videos are playing
+                // Only disable play button, keep fill button enabled
                 playAllButton.disabled = true;
+                
+                // Only disable the slots, don't disable the queue
+                document.querySelectorAll('.slot').forEach(slot => {
+                    slot.classList.add('disabled');
+                });
             } else {
                 // Hide playing indicator
                 playingDiv.style.display = 'none';
                 
-                // Enable play button if slots have items
+                // Enable buttons
                 updatePlayAllButton();
                 
                 // Clear any timer interval
                 if (window.countdownInterval) {
                     clearInterval(window.countdownInterval);
                     window.countdownInterval = null;
+                }
+                
+                // If this is a natural completion of the experience (not manual restart),
+                // clear all slots when the state changes to not running
+                if (currentVideo === "Finishing in groups (30 seconds)") {
+                    console.log("Natural completion of the experience - clearing slots");
+                    
+                    // Get full data for all burners in slots before clearing them
+                    const burnersToRemove = [];
+                    document.querySelectorAll('.slot .queue-item').forEach(item => {
+                        if (item.dataset.name) {
+                            // Extract all necessary identifying information
+                            const burnerData = {
+                                name: item.dataset.name,
+                                challenge_point: item.dataset.challenge_point,
+                                envi_state: item.dataset.envi_state
+                            };
+                            burnersToRemove.push(burnerData);
+                        }
+                    });
+                    
+                    console.log('Burners to remove from backend queue:', burnersToRemove);
+                    
+                    // Clear slots
+                    document.querySelectorAll('.slot').forEach(slot => {
+                        slot.innerHTML = '';
+                    });
+                    
+                    // Remove specific burners from backend queue
+                    if (burnersToRemove.length > 0) {
+                        removeFromBackendQueue(burnersToRemove);
+                    }
                 }
                 
                 // Remove all disabled classes
@@ -713,21 +778,53 @@
                         
                         // Start the final 30 second countdown
                         startCountdownTimer(30, () => {
+                            console.log('Final countdown complete - clearing all slots');
+                            
+                            // Get full data for all burners in slots before clearing them
+                            const burnersToRemove = [];
+                            document.querySelectorAll('.slot .queue-item').forEach(item => {
+                                if (item.dataset.name) {
+                                    // Extract all necessary identifying information
+                                    const burnerData = {
+                                        name: item.dataset.name,
+                                        challenge_point: item.dataset.challenge_point,
+                                        envi_state: item.dataset.envi_state
+                                    };
+                                    burnersToRemove.push(burnerData);
+                                }
+                            });
+                            
+                            console.log('Burners to remove from backend queue:', burnersToRemove);
+                            
+                            // Send a request to clear these specific burners from the backend queue
+                            fetch('/clear-processed-burners', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ burners_to_remove: burnersToRemove })
+                            })
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.error('Failed to clear processed burners');
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                console.log('Backend response:', data);
+                            })
+                            .catch(error => {
+                                console.error('Error clearing processed burners:', error);
+                            });
+                            
                             setTurningPointState(false);
                             
-                            // Clear all slots after the entire experience is finished
-                            document.querySelectorAll('.slot').forEach(slot => {
-                                if (slot.children.length > 0) {
-                                    // Fade out effect
-                                    const item = slot.children[0];
-                                    item.style.transition = "opacity 0.5s";
-                                    item.style.opacity = 0;
-                                    
-                                    // Remove after animation completes
-                                    setTimeout(() => {
-                                        slot.innerHTML = '';
-                                    }, 500);
-                                }
+                            // Simply clear all slots when done - with explicit logging
+                            const slots = document.querySelectorAll('.slot');
+                            console.log(`Clearing ${slots.length} slots`);
+                            slots.forEach((slot, i) => {
+                                console.log(`Clearing slot ${i}`);
+                                slot.innerHTML = '';
                             });
                             
                             // Update play button state
@@ -754,7 +851,7 @@
                 if (!item) return null;
                 
                 try {
-                    const text = item.textContent.trim();
+                const text = item.textContent.trim();
                     // Check if the text contains the expected delimiters
                     const parts = text.split(' - ');
                     const name = parts[0].trim();
@@ -766,18 +863,18 @@
                         challenge_point = envParts[0].trim();
                         envi_state = envParts.length > 1 ? envParts[1].trim() : '';
                     }
-                    
-                    const videoData = {
-                        index: index,
+                
+                const videoData = {
+                    index: index,
                         name: name,
                         challenge_point: challenge_point,
                         envi_state: envi_state,
-                        video: item.dataset.video,
+                    video: item.dataset.video,
                         channel: parseInt(item.dataset.channel) // Note: +1 will be added on the backend
-                    };
-                    
-                    console.log('Video data:', videoData);  // Debug log
-                    return videoData;
+                };
+                
+                console.log('Video data:', videoData);  // Debug log
+                return videoData;
                 } catch (error) {
                     console.error('Error parsing video data:', error);
                     return null;
@@ -858,11 +955,28 @@
                 return;
             }
 
+            // Get full data for all burners in slots before clearing them
+            const burnersToRemove = [];
+            document.querySelectorAll('.slot .queue-item').forEach(item => {
+                if (item.dataset.name) {
+                    // Extract all necessary identifying information
+                    const burnerData = {
+                        name: item.dataset.name,
+                        challenge_point: item.dataset.challenge_point,
+                        envi_state: item.dataset.envi_state
+                    };
+                    burnersToRemove.push(burnerData);
+                }
+            });
+            
+            console.log('Burners to remove from backend queue:', burnersToRemove);
+
             fetch('/stop-all', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                }
+                },
+                body: JSON.stringify({ burners_to_remove: burnersToRemove })
             })
             .then(response => {
                 if (!response.ok) {
@@ -892,21 +1006,13 @@
                         window.countdownInterval = null;
                     }
                     
-                    // Clear all slots (IMPORTANT: this is what the user requested)
+                    // Simply clear all slots
                     document.querySelectorAll('.slot').forEach(slot => {
-                        // Fade out effect for items
-                        if (slot.children.length > 0) {
-                            const item = slot.children[0];
-                            item.style.transition = "opacity 0.5s";
-                            item.style.opacity = 0;
-                            
-                            // Remove after animation completes
-                            setTimeout(() => {
-                                slot.innerHTML = '';
-                                updatePlayAllButton();
-                            }, 500);
-                        }
+                        slot.innerHTML = '';
                     });
+                    
+                    // Update play button state
+                    updatePlayAllButton();
                     
                 } else {
                     status.className = 'status error';
@@ -1023,17 +1129,11 @@
             }
             
             // Get all slots
-            const slots = document.querySelectorAll('.slot');
+            const emptySlots = Array.from(document.querySelectorAll('.slot')).filter(slot => 
+                slot.children.length === 0 && !slot.classList.contains('disabled')
+            );
             
-            // Count how many are already filled
-            let filledCount = 0;
-            slots.forEach(slot => {
-                if (slot.children.length > 0) {
-                    filledCount++;
-                }
-            });
-            
-            if (filledCount >= 6) {
+            if (emptySlots.length === 0) {
                 // All slots already filled
                 const status = document.getElementById('status');
                 status.style.display = 'block';
@@ -1045,43 +1145,45 @@
                 return;
             }
             
-            // Fill empty slots with queue items
-            let movedCount = 0;
-            let i = 0;
+            // Determine how many to move (min of queue size and empty slots)
+            const itemsToMove = Math.min(queueItems.length, emptySlots.length);
             
-            // First, find all empty slots
-            const emptySlots = Array.from(slots).filter(slot => 
-                slot.children.length === 0 && !slot.classList.contains('disabled')
-            );
-            
-            // Then, move items from queue to empty slots
-            while (i < queueItems.length && movedCount < emptySlots.length) {
+            // Move items from queue to empty slots
+            for (let i = 0; i < itemsToMove; i++) {
                 const item = queueItems[i];
-                const slot = emptySlots[movedCount];
+                const slot = emptySlots[i];
                 
-                // Clone the item for the animation effect
+                // Clone the item
                 const clone = item.cloneNode(true);
                 clone.style.opacity = '0';
+                
+                // Copy the drag event handler
+                clone.ondragstart = (e) => {
+                    if (clone.classList.contains('disabled')) {
+                        e.preventDefault();
+                        return;
+                    }
+                    e.dataTransfer.setData('text/plain', clone.id);
+                };
+                
+                // Add to slot
                 slot.appendChild(clone);
                 
-                // Remove the original item
+                // Remove from queue
                 item.parentNode.removeChild(item);
                 
-                // Fade in the cloned item
+                // Fade in effect
                 setTimeout(() => {
                     clone.style.transition = 'opacity 0.5s';
                     clone.style.opacity = '1';
                 }, 10);
-                
-                movedCount++;
-                // Don't increment i since the collection is live and will change
             }
             
             // Show status message
             const status = document.getElementById('status');
             status.style.display = 'block';
             status.className = 'status success';
-            status.textContent = `Moved ${movedCount} burners to slots!`;
+            status.textContent = `Moved ${itemsToMove} burners to slots!`;
             setTimeout(() => {
                 status.style.display = 'none';
             }, 3000);
@@ -1124,6 +1226,39 @@
                     // Get the name for status message
                     const name = item.textContent.trim().split(' - ')[0].trim();
                     
+                    // Get full burner data to remove from backend
+                    if (item.dataset.name && item.dataset.challenge_point && item.dataset.envi_state) {
+                        // Create burner data object matching the format expected by the backend
+                        const burnerData = {
+                            name: item.dataset.name,
+                            challenge_point: item.dataset.challenge_point,
+                            envi_state: item.dataset.envi_state
+                        };
+                        
+                        // Remove this specific burner from the backend queue
+                        fetch('/clear-processed-burners', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ 
+                                burners_to_remove: [burnerData] 
+                            })
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                console.error('Failed to remove burner from backend queue');
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('Backend response:', data);
+                        })
+                        .catch(error => {
+                            console.error('Error removing burner from backend queue:', error);
+                        });
+                    }
+                    
                     // Remove from DOM with fade-out effect
                     item.style.transition = "opacity 0.5s";
                     item.style.opacity = 0;
@@ -1145,6 +1280,31 @@
                 }
             }
         };
+
+        // Function to remove specific burners from backend queue
+        function removeFromBackendQueue(burnerNames) {
+            console.log(`Removing ${burnerNames.length} burners from backend queue:`, burnerNames);
+            
+            fetch('/remove-from-queue', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    names: burnerNames
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    console.error('Failed to remove burners from backend queue');
+                    return;
+                }
+                console.log('Successfully removed burners from backend queue');
+            })
+            .catch(error => {
+                console.error('Error removing burners from backend queue:', error);
+            });
+        }
     </script>
 </body>
 </html> 
