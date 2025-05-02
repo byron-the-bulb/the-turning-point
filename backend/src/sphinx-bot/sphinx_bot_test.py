@@ -342,6 +342,39 @@ async def test_pipecat_flow(json_file_path):
         if not test_passed:
             print(f"Error: {error_msg}")
         print("="*80 + "\n")
+
+        #print flow manager final state
+        print("\n" + "="*80)
+        print("FLOW MANAGER FINAL STATE:")
+        print("="*80)
+        print(flow_manager.state)
+        print("="*80 + "\n")
+        
+        # Send trigger to resolume_control endpoint
+        logger.info("Sending trigger to resolume_control endpoint")
+        try:
+            import requests
+            
+            # Prepare payload for resolume_control server using flow manager state
+            payload = {
+                "name": flow_manager.state.get("name", ""),  # Leave empty as in frontend implementation
+                "challenge_point": flow_manager.state.get("challenge", ""),  # Not specified in requirements
+                "envi_state": flow_manager.state.get("empowered_state", ""),
+                "emotions": flow_manager.state.get("combined_emotions", {})
+            }
+            
+            # Resolume control server URL (using same default as frontend)
+            resolume_control_url = os.getenv("RESOLUME_CONTROL_URL", "http://localhost:8000")
+            
+            logger.info(f"Resolume control payload: {payload}")
+            response = requests.post(f"{resolume_control_url}/trigger_video", json=payload)
+            
+            if response.status_code == 200:
+                logger.info("Successfully triggered resolume_control endpoint")
+            else:
+                logger.error(f"Failed to trigger resolume_control endpoint: {response.status_code} - {response.text}")
+        except Exception as e:
+            logger.error(f"Error triggering resolume_control endpoint: {e}")
             
     except asyncio.CancelledError:
         logger.info("Main test task cancelled, shutting down gracefully...")

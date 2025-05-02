@@ -182,7 +182,8 @@ def create_initial_node()->NodeConfig:
 async def collect_name_handler(args: FlowArgs, flow_manager: FlowManager) -> FlowResult:
     user_name = args.get("user_name", "").strip()
     retry_count = flow_manager.state.get("name_retry_count", 0)
-    
+    # Store the confirmed name in the flow state
+    flow_manager.state["user_name"] = user_name
     # Basic validation - name should be at least 2 characters and not contain numbers
     if len(user_name) >= 2 and not any(c.isdigit() for c in user_name):
         flow_manager.state["name_retry_count"] = 0
@@ -225,8 +226,6 @@ async def confirm_name_callback(
 ):
     logger.info(f"[Flow]confirm_name_callback: {result}")
     if result["confirmed"]:
-        # Store the confirmed name in the flow state
-        flow_manager.state["user_name"] = args.get("user_name", "Seeker")
         # Transition to the challenge identification stage
         await flow_manager.set_node("identify_challenge", create_identify_challenge_node())
     else:
@@ -295,6 +294,7 @@ async def identify_challenge_callback(
 ):
     logger.info(f"[Flow]identify_challenge_callback {result}")
     if result["status"] == "success":
+        flow_manager.state["challenge"] = result["challenge"]
         await flow_manager.set_node("confirm_challenge", create_confirm_challenge_node(flow_manager))
     else:
         # If the challenge is invalid, move to select_challenge stage

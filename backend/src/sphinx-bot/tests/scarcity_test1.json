@@ -6,7 +6,194 @@
     {"text": "I feel like I don't have enough money to live a comfortable life. I'm always worried about running out of money. I always feel I don't have enough and I have a hard time sharing.", "node": "identify_challenge"},
     {"text": "Yes", "node": "confirm_challenge"},
     {"text": "I see myself being happy with whatever money I have. I will be contributing to a community I care about and make a difference without worrying about myself. ", "node": "identify_empowered_state", 
-    "flow_manager_state" : {"emotions_summary": "Relief, Contentment, Excitement", "emotions_fully_processed": true}},
+    "flow_manager_state" : {"emotions_summary": "Relief, Contentment, Excitement", "emotions_fully_processed": true,
+    "combined_emotions": [
+            {
+                "name": "Admiration",
+                "score": 0.040450699627399445
+            },
+            {
+                "name": "Adoration",
+                "score": 0.02650925889611244
+            },
+            {
+                "name": "Aesthetic Appreciation",
+                "score": 0.007224092725664377
+            },
+            {
+                "name": "Amusement",
+                "score": 0.017458448186516762
+            },
+            {
+                "name": "Awe",
+                "score": 0.01588636077940464
+            },
+            {
+                "name": "Awkwardness",
+                "score": 0.02646772563457489
+            },
+            {
+                "name": "Boredom",
+                "score": 0.011851990595459938
+            },
+            {
+                "name": "Calmness",
+                "score": 0.14770126342773438
+            },
+            {
+                "name": "Concentration",
+                "score": 0.0890844464302063
+            },
+            {
+                "name": "Contemplation",
+                "score": 0.15504522621631622
+            },
+            {
+                "name": "Confusion",
+                "score": 0.006171478424221277
+            },
+            {
+                "name": "Contempt",
+                "score": 0.018815400078892708
+            },
+            {
+                "name": "Contentment",
+                "score": 0.00991176813840866
+            },
+            {
+                "name": "Craving",
+                "score": 0.00971412006765604
+            },
+            {
+                "name": "Determination",
+                "score": 0.15444917976856232
+            },
+            {
+                "name": "Disappointment",
+                "score": 0.09081929922103882
+            },
+            {
+                "name": "Disgust",
+                "score": 0.04137858375906944
+            },
+            {
+                "name": "Distress",
+                "score": 0.021112769842147827
+            },
+            {
+                "name": "Doubt",
+                "score": 0.020696014165878296
+            },
+            {
+                "name": "Ecstasy",
+                "score": 0.00872095301747322
+            },
+            {
+                "name": "Embarrassment",
+                "score": 0.016412194818258286
+            },
+            {
+                "name": "Empathic Pain",
+                "score": 0.01110144890844822
+            },
+            {
+                "name": "Entrancement",
+                "score": 0.019884657114744183
+            },
+            {
+                "name": "Envy",
+                "score": 0.011445999145507812
+            },
+            {
+                "name": "Excitement",
+                "score": 0.012153573334217072
+            },
+            {
+                "name": "Fear",
+                "score": 0.00485392939299345
+            },
+            {
+                "name": "Guilt",
+                "score": 0.01556272618472576
+            },
+            {
+                "name": "Horror",
+                "score": 0.0045961965806782246
+            },
+            {
+                "name": "Interest",
+                "score": 0.023833978921175003
+            },
+            {
+                "name": "Joy",
+                "score": 0.009424211457371712
+            },
+            {
+                "name": "Love",
+                "score": 0.013905437663197516
+            },
+            {
+                "name": "Nostalgia",
+                "score": 0.02188935875892639
+            },
+            {
+                "name": "Pain",
+                "score": 0.008909586817026138
+            },
+            {
+                "name": "Pride",
+                "score": 0.05825226753950119
+            },
+            {
+                "name": "Realization",
+                "score": 0.3032917082309723
+            },
+            {
+                "name": "Relief",
+                "score": 0.012976568192243576
+            },
+            {
+                "name": "Romance",
+                "score": 0.009462330490350723
+            },
+            {
+                "name": "Sadness",
+                "score": 0.050660740584135056
+            },
+            {
+                "name": "Satisfaction",
+                "score": 0.026201440021395683
+            },
+            {
+                "name": "Desire",
+                "score": 0.010633035562932491
+            },
+            {
+                "name": "Shame",
+                "score": 0.027789540588855743
+            },
+            {
+                "name": "Surprise (negative)",
+                "score": 0.016523798927664757
+            },
+            {
+                "name": "Surprise (positive)",
+                "score": 0.02356637828052044
+            },
+            {
+                "name": "Sympathy",
+                "score": 0.02463877759873867
+            },
+            {
+                "name": "Tiredness",
+                "score": 0.01898164488375187
+            },
+            {
+                "name": "Triumph",
+                "score": 0.03912077471613884
+            }
+        ]
+    }},
     {"text": "Yes", "node": "confirm_empowered_state"},
     {"text": "goodbye", "node": "goodbye"}
 ],

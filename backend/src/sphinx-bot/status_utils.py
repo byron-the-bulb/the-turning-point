@@ -73,7 +73,7 @@ class StatusUpdater:
         data = {
             "trigger": "VideoTrigger",
             "identifier": self.identifier,
-            "empowered_state_data": empowered_state_data
+            "empowered_state_data": empowered_state_data,
         }
         
         try:

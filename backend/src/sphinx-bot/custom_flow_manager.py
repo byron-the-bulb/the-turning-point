@@ -38,10 +38,16 @@ class CustomFlowManager(FlowManager):
                 empowered_state = self.state["empowered_state"]
                 combined_emotions = self.state.get("combined_emotions", None)
                 challenge = self.state.get("challenge", None)
+                user_name = self.state.get("user_name", None)
+
+                empowered_state_data = {
+                    "empowered_state" : empowered_state,
+                    "combined_emotions" : combined_emotions,
+                    "challenge" : challenge,
+                    "user_name" : user_name
+                }
                 
                 await status_updater.trigger_video(
                     f"Empowered state detected : {empowered_state}",
-                    {"empowered_state" : empowered_state,
-                    "combined_emotions" : combined_emotions,
-                    "challenge" : challenge}
+                    empowered_state_data
                 )
