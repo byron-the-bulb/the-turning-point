@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Turning Point Video Controller</title>
+    <title>Turning Point Controller</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -156,10 +156,135 @@
             border-radius: 4px;
             cursor: pointer;
         }
+        /* Turning Point playing state */
+        .turning-point-playing {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: rgba(255, 193, 7, 0.2);
+            border-radius: 8px;
+            border: 2px solid rgba(255, 193, 7, 0.5);
+            display: none;
+        }
+        .playing-indicator {
+            background-color: rgba(255, 193, 7, 0.9);
+            color: #856404;
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 4px;
+            animation: pulse 1.5s infinite alternate;
+        }
+        .timer {
+            background-color: rgba(0, 0, 0, 0.1);
+            color: #856404;
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-left: 10px;
+            min-width: 50px;
+            display: inline-block;
+            text-align: center;
+        }
+        @keyframes pulse {
+            from { background-color: rgba(255, 193, 7, 0.9); }
+            to { background-color: rgba(255, 193, 7, 0.6); }
+        }
+        .slot.disabled, .queue.disabled {
+            opacity: 0.7;
+            background-color: rgba(241, 237, 233, 0.5);
+            cursor: not-allowed;
+        }
+        .queue-item.disabled {
+            cursor: not-allowed;
+        }
+        .active-video {
+            border: 3px solid #ffc107;
+            background-color: rgba(255, 248, 225, 0.8);
+        }
+        .stop-button {
+            background-color: rgba(220, 53, 69, 0.9);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 18px;
+            margin-top: 10px;
+            width: 100%;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+            font-weight: bold;
+        }
+        .stop-button:hover {
+            background-color: rgba(200, 35, 51, 0.95);
+        }
+        .restart-button {
+            background-color: rgba(255, 193, 7, 0.9);
+            color: black;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 18px;
+            margin-top: 10px;
+            width: 100%;
+            text-shadow: 0 0 2px rgba(255, 255, 255, 0.5);
+            font-weight: bold;
+        }
+        .restart-button:hover {
+            background-color: rgba(240, 173, 0, 0.95);
+        }
+        .fill-button {
+            background-color: rgba(13, 110, 253, 0.9);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 18px;
+            margin-top: 10px;
+            width: 100%;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+            font-weight: bold;
+        }
+        .fill-button:hover {
+            background-color: rgba(10, 88, 202, 0.95);
+        }
+        .fill-button:disabled {
+            background-color: rgba(13, 110, 253, 0.5);
+            cursor: not-allowed;
+        }
+        .button-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .discard-bucket {
+            background-color: rgba(108, 117, 125, 0.8);
+            border: 2px dashed #dc3545;
+            color: white;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 8px;
+            text-align: center;
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s;
+        }
+        .discard-bucket.dragover {
+            background-color: rgba(220, 53, 69, 0.8);
+            border-style: solid;
+        }
+        .discard-bucket i {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
-    <h1>Turning Point Video Controller</h1>
+    <h1>Turning Point Controller</h1>
     
     <!-- Help notification panel -->
     <div id="helpNotification" class="help-notification help-needed">
@@ -173,11 +298,35 @@
         <button id="testHelpButton" class="help-button">Test Help Request</button>
     </div>
 
+    <!-- Turning Point Playing Status -->
+    <div id="turningPointPlaying" class="turning-point-playing">
+        <h3>Turning Point Running</h3>
+        <div>
+            <span class="playing-indicator">NOW PLAYING</span>
+            <span id="currentVideoPlaying">Intro Video</span>
+            <span class="timer" id="videoTimer">0:00</span>
+        </div>
+        <p>Please wait until all videos finish playing before making changes.</p>
+    </div>
+
     <div class="container">
         <div class="queue" id="queue">
             <h2>Waiting Burners</h2>
+            
+            <!-- Add the fill button above the queue -->
+            <button id="fill-button" class="fill-button" onclick="fillSlotsFromQueue()">
+                Fill Slots from Queue
+            </button>
+            
             <div id="queue-list">
                 <!-- Queue items will be added here dynamically -->
+            </div>
+            
+            <!-- Discard bucket -->
+            <div class="discard-bucket" id="discard-bucket">
+                <i>🗑️</i>
+                <div>Burner got too high or disappeared</div>
+                <small>(Drag and drop here to remove)</small>
             </div>
         </div>
 
@@ -186,15 +335,28 @@
             <div id="slots-container">
                 <!-- 6 slots will be added here -->
             </div>
-            <button id="play-all-button" class="play-all-button" onclick="playAllVideos()" disabled>
-                Send Videos to Turning Point
-            </button>
+            <div class="button-container">
+                <button id="play-all-button" class="play-all-button" onclick="playAllVideos()" disabled>
+                    START Turning Point
+                </button>
+                <button id="stop-button" class="stop-button" onclick="stopAllVideos()">
+                    STOP Turning Point (and clear burners)
+                </button>
+                <button id="restart-button" class="restart-button" onclick="restartTurningPoint()">
+                    STOP (and keep burners)
+                </button>
+            </div>
         </div>
     </div>
 
     <div id="status" class="status" style="display: none;"></div>
 
     <script>
+        // Turning Point state
+        let isTurningPointRunning = false;
+        let currentPlayingVideo = ""; // Track which video is currently playing
+        let activeVideoIndex = -1; // Track which slot is active
+        
         // Initialize slots
         const slotsContainer = document.getElementById('slots-container');
         for (let i = 0; i < 6; i++) {
@@ -202,6 +364,11 @@
             slot.className = 'slot';
             slot.id = `slot-${i}`;
             slot.ondragover = (e) => {
+                // Check if this specific slot is disabled
+                if (slot.classList.contains('disabled')) {
+                    e.preventDefault();
+                    return; // Don't allow drop on disabled slots
+                }
                 e.preventDefault();
                 slot.classList.add('dragover');
             };
@@ -209,6 +376,11 @@
                 slot.classList.remove('dragover');
             };
             slot.ondrop = (e) => {
+                // Check if this specific slot is disabled
+                if (slot.classList.contains('disabled')) {
+                    e.preventDefault();
+                    return; // Don't allow drop on disabled slots
+                }
                 e.preventDefault();
                 slot.classList.remove('dragover');
                 const itemId = e.dataTransfer.getData('text/plain');
@@ -321,7 +493,7 @@
         function findFirstEmptySlot() {
             const slots = document.querySelectorAll('.slot');
             for (let i = 0; i < slots.length; i++) {
-                if (slots[i].children.length === 0) {
+                if (slots[i].children.length === 0 && !slots[i].classList.contains('disabled')) {
                     return slots[i];
                 }
             }
@@ -349,18 +521,25 @@
                             div.id = itemId;
                             div.draggable = true;
                             div.ondragstart = (e) => {
+                                // Check if this specific item is disabled
+                                if (div.classList.contains('disabled')) {
+                                    e.preventDefault();
+                                    return; // Don't allow drag of disabled items
+                                }
                                 e.dataTransfer.setData('text/plain', div.id);
                             };
                             // Store the video and channel information
+                            // Note: The channel number will be automatically adjusted in the backend
+                            // by adding +1 to account for the empty first column in Resolume
                             div.dataset.video = item.video;
                             div.dataset.channel = item.channel;
                             div.innerHTML = `
                                 <strong>${item.name}</strong> - ${item.challenge_point} to ${item.envi_state}
                             `;
                             
-                            // Try to place in first empty slot
+                            // Try to place in first empty slot that's not disabled
                             const emptySlot = findFirstEmptySlot();
-                            if (emptySlot) {
+                            if (emptySlot && !emptySlot.classList.contains('disabled')) {
                                 emptySlot.appendChild(div);
                             } else {
                                 queueList.appendChild(div);
@@ -398,7 +577,174 @@
             const playAllButton = document.getElementById('play-all-button');
             const slots = document.querySelectorAll('.slot');
             const hasItems = Array.from(slots).some(slot => slot.children.length > 0);
-            playAllButton.disabled = !hasItems;
+            playAllButton.disabled = !hasItems || isTurningPointRunning;
+        }
+
+        function setTurningPointState(isRunning, currentVideo = "Intro Video") {
+            console.log(`Setting turning point state: running=${isRunning}, video=${currentVideo}`);
+            isTurningPointRunning = isRunning;
+            currentPlayingVideo = currentVideo;
+            
+            // Update UI elements
+            const playingDiv = document.getElementById('turningPointPlaying');
+            const currentVideoText = document.getElementById('currentVideoPlaying');
+            const playAllButton = document.getElementById('play-all-button');
+            
+            if (isRunning) {
+                // Show playing indicator
+                playingDiv.style.display = 'block';
+                currentVideoText.textContent = currentVideo;
+                
+                // Disable play button while videos are playing
+                playAllButton.disabled = true;
+            } else {
+                // Hide playing indicator
+                playingDiv.style.display = 'none';
+                
+                // Enable play button if slots have items
+                updatePlayAllButton();
+                
+                // Clear any timer interval
+                if (window.countdownInterval) {
+                    clearInterval(window.countdownInterval);
+                    window.countdownInterval = null;
+                }
+                
+                // Remove all disabled classes
+                document.querySelectorAll('.slot').forEach(slot => {
+                    slot.classList.remove('disabled');
+                });
+                document.querySelectorAll('.queue-item').forEach(item => {
+                    item.classList.remove('disabled');
+                    item.draggable = true;
+                });
+            }
+        }
+
+        function startCountdownTimer(seconds, onComplete = null) {
+            console.log(`Starting countdown: ${seconds} seconds`);
+            // Clear any existing timer interval
+            if (window.countdownInterval) {
+                clearInterval(window.countdownInterval);
+            }
+            
+            const timerElement = document.getElementById('videoTimer');
+            let remainingSeconds = seconds;
+            
+            // Update timer immediately
+            updateTimerDisplay(remainingSeconds, timerElement);
+            
+            // Then update every second
+            window.countdownInterval = setInterval(() => {
+                remainingSeconds--;
+                
+                updateTimerDisplay(remainingSeconds, timerElement);
+                
+                if (remainingSeconds <= 0) {
+                    clearInterval(window.countdownInterval);
+                    window.countdownInterval = null;
+                    console.log('Timer completed');
+                    if (onComplete && typeof onComplete === 'function') {
+                        console.log('Executing onComplete callback');
+                        onComplete();
+                    }
+                }
+            }, 1000);
+        }
+        
+        function updateTimerDisplay(seconds, element) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            element.textContent = `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+
+        function updateActiveVideo(slotIndex) {
+            console.log(`Updating active video to slot ${slotIndex}`);
+            activeVideoIndex = slotIndex;
+            
+            // Clear previous active video and disabled status
+            document.querySelectorAll('.slot').forEach(slot => {
+                slot.classList.remove('active-video');
+            });
+            
+            // Set new active video if index is valid
+            if (slotIndex >= 0) {
+                const activeSlot = document.getElementById(`slot-${slotIndex}`);
+                if (activeSlot) {
+                    // Add active-video class and disabled class
+                    activeSlot.classList.add('active-video');
+                    activeSlot.classList.add('disabled');
+                    
+                    // Disable dragging for the item in this slot
+                    const queueItem = activeSlot.querySelector('.queue-item');
+                    if (queueItem) {
+                        queueItem.classList.add('disabled');
+                        queueItem.draggable = false;
+                        
+                        // Update current video playing text
+                        const text = queueItem.textContent.trim();
+                        const name = text.split(' - ')[0].trim();
+                        document.getElementById('currentVideoPlaying').textContent = name;
+                    }
+                }
+            }
+        }
+
+        function playNextVideo(index, videos) {
+            console.log(`Playing next video: index=${index}`);
+            if (index < videos.length) {
+                setTurningPointState(true, videos[index].name);
+                updateActiveVideo(index);
+                
+                // Start countdown for this video (28 seconds)
+                const nextIndex = index + 1;
+                if (nextIndex < videos.length) {
+                    startCountdownTimer(28, () => playNextVideo(nextIndex, videos));
+                } else {
+                    // Last video - will play for 28 seconds in layer 2, then continue for 30 more seconds in group layers
+                    startCountdownTimer(28, () => {
+                        // After layer 2 turns off, show message that videos are finishing in groups
+                        setTurningPointState(true, "Finishing in groups (30 seconds)");
+                        
+                        // Clear active video highlighting but keep the slot disabled
+                        document.querySelectorAll('.slot').forEach(slot => {
+                            slot.classList.remove('active-video');
+                        });
+                        
+                        // Start the final 30 second countdown
+                        startCountdownTimer(30, () => {
+                            setTurningPointState(false);
+                            
+                            // Clear all slots after the entire experience is finished
+                            document.querySelectorAll('.slot').forEach(slot => {
+                                if (slot.children.length > 0) {
+                                    // Fade out effect
+                                    const item = slot.children[0];
+                                    item.style.transition = "opacity 0.5s";
+                                    item.style.opacity = 0;
+                                    
+                                    // Remove after animation completes
+                                    setTimeout(() => {
+                                        slot.innerHTML = '';
+                                    }, 500);
+                                }
+                            });
+                            
+                            // Update play button state
+                            updatePlayAllButton();
+                            
+                            // Show experience complete message
+                            const status = document.getElementById('status');
+                            status.style.display = 'block';
+                            status.className = 'status success';
+                            status.textContent = 'Turning Point Experience Complete!';
+                            setTimeout(() => {
+                                status.style.display = 'none';
+                            }, 3000);
+                        });
+                    });
+                }
+            }
         }
 
         function playAllVideos() {
@@ -427,7 +773,7 @@
                         challenge_point: challenge_point,
                         envi_state: envi_state,
                         video: item.dataset.video,
-                        channel: parseInt(item.dataset.channel)
+                        channel: parseInt(item.dataset.channel) // Note: +1 will be added on the backend
                     };
                     
                     console.log('Video data:', videoData);  // Debug log
@@ -452,6 +798,12 @@
             const requestData = { videos: videos };
             console.log('Sending request data:', requestData);  // Debug log
 
+            // Set turning point to running state
+            setTurningPointState(true, "Intro Video");
+            
+            // Start intro countdown (67 seconds) and chain to first video when done
+            startCountdownTimer(67, () => playNextVideo(0, videos));
+
             fetch('/play-all', {
                 method: 'POST',
                 headers: {
@@ -474,12 +826,11 @@
                 if (data.status === 'success') {
                     status.className = 'status success';
                     status.textContent = 'All videos triggered successfully!';
-                    // Clear slots after successful play
-                    slots.forEach(slot => slot.innerHTML = '');
-                    updatePlayAllButton();
                 } else {
                     status.className = 'status error';
                     status.textContent = 'Error: ' + data.message;
+                    // If there was an error, set turning point back to idle
+                    setTurningPointState(false);
                 }
                 setTimeout(() => {
                     status.style.display = 'none';
@@ -491,10 +842,252 @@
                 status.style.display = 'block';
                 status.className = 'status error';
                 status.textContent = 'Error: ' + error.message;
+                // If there was an error, set turning point back to idle
+                setTurningPointState(false);
                 setTimeout(() => {
                     status.style.display = 'none';
                 }, 3000);
             });
+        }
+
+        function stopAllVideos() {
+            console.log('Stopping all videos and clearing burners');
+
+            // Show confirmation dialog
+            if (!confirm('Are you sure you want to STOP Turning Point and CLEAR ALL BURNERS?')) {
+                return;
+            }
+
+            fetch('/stop-all', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        console.error('Server error:', err);
+                        throw new Error(err.detail || 'Server error');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                const status = document.getElementById('status');
+                status.style.display = 'block';
+                if (data.status === 'success') {
+                    status.className = 'status success';
+                    status.textContent = 'All videos stopped!';
+                    
+                    // Reset UI state
+                    setTurningPointState(false);
+                    
+                    // Clear any active video highlights
+                    updateActiveVideo(-1);
+                    
+                    // Clear timer
+                    if (window.countdownInterval) {
+                        clearInterval(window.countdownInterval);
+                        window.countdownInterval = null;
+                    }
+                    
+                    // Clear all slots (IMPORTANT: this is what the user requested)
+                    document.querySelectorAll('.slot').forEach(slot => {
+                        // Fade out effect for items
+                        if (slot.children.length > 0) {
+                            const item = slot.children[0];
+                            item.style.transition = "opacity 0.5s";
+                            item.style.opacity = 0;
+                            
+                            // Remove after animation completes
+                            setTimeout(() => {
+                                slot.innerHTML = '';
+                                updatePlayAllButton();
+                            }, 500);
+                        }
+                    });
+                    
+                } else {
+                    status.className = 'status error';
+                    status.textContent = 'Error: ' + data.message;
+                }
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 3000);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const status = document.getElementById('status');
+                status.style.display = 'block';
+                status.className = 'status error';
+                status.textContent = 'Error: ' + error.message;
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 3000);
+            });
+        }
+
+        function restartTurningPoint() {
+            console.log('Stopping Turning Point but keeping burners');
+
+            // Show confirmation dialog - note that this preserves slots
+            if (!confirm('Are you sure you want to STOP Turning Point but KEEP ALL BURNERS?')) {
+                return;
+            }
+
+            fetch('/restart', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        console.error('Server error:', err);
+                        throw new Error(err.detail || 'Server error');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                const status = document.getElementById('status');
+                status.style.display = 'block';
+                if (data.status === 'success') {
+                    status.className = 'status success';
+                    status.textContent = 'Turning Point stopped (burners preserved)';
+                    
+                    // Reset UI state but don't clear slots
+                    setTurningPointState(false);
+                    
+                    // Clear any active video highlights
+                    updateActiveVideo(-1);
+                    
+                    // Clear timer
+                    if (window.countdownInterval) {
+                        clearInterval(window.countdownInterval);
+                        window.countdownInterval = null;
+                    }
+                    
+                    // Enable all slots (they may have been disabled during playback)
+                    document.querySelectorAll('.slot').forEach(slot => {
+                        slot.classList.remove('disabled');
+                        
+                        // Re-enable dragging for any items
+                        const item = slot.querySelector('.queue-item');
+                        if (item) {
+                            item.classList.remove('disabled');
+                            item.draggable = true;
+                        }
+                    });
+                    
+                    // Update play button state
+                    updatePlayAllButton();
+                    
+                } else {
+                    status.className = 'status error';
+                    status.textContent = 'Error: ' + data.message;
+                }
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 3000);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const status = document.getElementById('status');
+                status.style.display = 'block';
+                status.className = 'status error';
+                status.textContent = 'Error: ' + error.message;
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 3000);
+            });
+        }
+
+        function fillSlotsFromQueue() {
+            console.log('Filling slots from queue');
+            
+            // Get all queue items
+            const queueItems = document.querySelectorAll('#queue-list .queue-item');
+            if (queueItems.length === 0) {
+                // Show message if queue is empty
+                const status = document.getElementById('status');
+                status.style.display = 'block';
+                status.className = 'status error';
+                status.textContent = 'Queue is empty!';
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 3000);
+                return;
+            }
+            
+            // Get all slots
+            const slots = document.querySelectorAll('.slot');
+            
+            // Count how many are already filled
+            let filledCount = 0;
+            slots.forEach(slot => {
+                if (slot.children.length > 0) {
+                    filledCount++;
+                }
+            });
+            
+            if (filledCount >= 6) {
+                // All slots already filled
+                const status = document.getElementById('status');
+                status.style.display = 'block';
+                status.className = 'status error';
+                status.textContent = 'All slots are already filled!';
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 3000);
+                return;
+            }
+            
+            // Fill empty slots with queue items
+            let movedCount = 0;
+            let i = 0;
+            
+            // First, find all empty slots
+            const emptySlots = Array.from(slots).filter(slot => 
+                slot.children.length === 0 && !slot.classList.contains('disabled')
+            );
+            
+            // Then, move items from queue to empty slots
+            while (i < queueItems.length && movedCount < emptySlots.length) {
+                const item = queueItems[i];
+                const slot = emptySlots[movedCount];
+                
+                // Clone the item for the animation effect
+                const clone = item.cloneNode(true);
+                clone.style.opacity = '0';
+                slot.appendChild(clone);
+                
+                // Remove the original item
+                item.parentNode.removeChild(item);
+                
+                // Fade in the cloned item
+                setTimeout(() => {
+                    clone.style.transition = 'opacity 0.5s';
+                    clone.style.opacity = '1';
+                }, 10);
+                
+                movedCount++;
+                // Don't increment i since the collection is live and will change
+            }
+            
+            // Show status message
+            const status = document.getElementById('status');
+            status.style.display = 'block';
+            status.className = 'status success';
+            status.textContent = `Moved ${movedCount} burners to slots!`;
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, 3000);
+            
+            // Update play button state
+            updatePlayAllButton();
         }
 
         // Initialize help status
@@ -508,6 +1101,50 @@
         
         // Initial update
         updateQueue();
+
+        // Initialize discard bucket
+        const discardBucket = document.getElementById('discard-bucket');
+        discardBucket.ondragover = (e) => {
+            e.preventDefault();
+            discardBucket.classList.add('dragover');
+        };
+        discardBucket.ondragleave = () => {
+            discardBucket.classList.remove('dragover');
+        };
+        discardBucket.ondrop = (e) => {
+            e.preventDefault();
+            discardBucket.classList.remove('dragover');
+            
+            const itemId = e.dataTransfer.getData('text/plain');
+            const item = document.getElementById(itemId);
+            
+            if (item) {
+                // Show confirmation
+                if (confirm("Are you sure you want to remove this burner?")) {
+                    // Get the name for status message
+                    const name = item.textContent.trim().split(' - ')[0].trim();
+                    
+                    // Remove from DOM with fade-out effect
+                    item.style.transition = "opacity 0.5s";
+                    item.style.opacity = 0;
+                    setTimeout(() => {
+                        item.parentNode.removeChild(item);
+                        
+                        // Show status message
+                        const status = document.getElementById('status');
+                        status.style.display = 'block';
+                        status.className = 'status success';
+                        status.textContent = `Removed burner: ${name}`;
+                        setTimeout(() => {
+                            status.style.display = 'none';
+                        }, 3000);
+                        
+                        // Update play button state
+                        updatePlayAllButton();
+                    }, 500);
+                }
+            }
+        };
     </script>
 </body>
 </html> 

@@ -10,9 +10,10 @@ from pydantic import BaseModel, validator, ValidationError, Field
 from typing import List, Dict, Optional
 import os
 from collections import deque
+import asyncio
 
 # Resolume OSC settings
-RESOLUME_IP = "127.0.0.1"  # Localhost
+RESOLUME_IP = "192.168.1.187"  # Localhost
 RESOLUME_PORT = 7000       # Default Resolume OSC port
 
 # Initialize FastAPI app
@@ -26,6 +27,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Initialize request queue
 request_queue = deque()
+
+# Global task tracker for the play_video_sequence
+current_play_task = None
 
 # Load video metadata
 def load_metadata():
@@ -140,18 +144,34 @@ def find_matching_video(envi_state: str, emotions: Dict[str, float]) -> Optional
 
 def set_text_overlay(text: str, layer: int):
     """
-    Set text overlay in Resolume for a specific layer
+    Set text overlay in Resolume for a specific layer/group
+    
+    Layer mapping:
+    Layer 1: composition 
+    Layer 2: square
+    Layer 3: Group 3
+    Layer 4: Group 4 
+    etc.
     """
     if not client:
         raise HTTPException(status_code=500, detail="OSC client not initialized")
     
     try:
-        # Set the text content using the correct address
-        message = f"/composition/layers/{layer}/video/effects/text/params/lines"
+        # Use the correct address format for groups - ONLY FOR TEXT OVERLAYS
+        if layer == 1:
+            # Special case for composition layer
+            message = f"/composition/video/effects/textblock/effect/text/params/lines"
+        elif layer == 2:
+            # Special case for square layer
+            message = f"/composition/square/video/effects/textblock/effect/text/params/lines"
+        else:
+            # For layers 3 and above, they correspond to group numbers
+            message = f"/composition/groups/{layer}/video/effects/textblock/effect/text/params/lines"
+            
         print(f"Sending OSC message: {message} with value: {text}")
         client.send_message(message, text)
         
-        print(f"Successfully set text overlay for layer {layer}: {text}")
+        print(f"Successfully set text overlay for layer/group {layer}: {text}")
     except Exception as e:
         print(f"Error setting text overlay: {e}")
         raise HTTPException(status_code=500, detail=f"Error setting text overlay: {e}")
@@ -169,14 +189,46 @@ def trigger_video(filename: str, name: str, challenge_point: str, envi_state: st
         text = f"{name} - {challenge_point} to {envi_state}"
         set_text_overlay(text, layer)
         
-        # Trigger the video
-        message = f"/composition/layers/{layer}/clips/{channel}/connect"
-        print(f"Sending OSC message: {message} with value: 1")
+        # Add +1 to the channel to account for empty first column
+        adjusted_channel = channel + 1
+        
+        # IMPORTANT: Always use the original layer-based addressing for clips
+        message = f"/composition/layers/{layer}/clips/{adjusted_channel}/connect"
+            
+        print(f"Sending OSC message: {message} with value: 1 (adjusted from channel {channel})")
         client.send_message(message, 1)  # Send value 1 to trigger the clip
-        print(f"Successfully triggered video {filename} on layer {layer}")
+        print(f"Successfully triggered video {filename} on layer {layer}, channel {adjusted_channel}")
     except Exception as e:
         print(f"Error sending OSC message: {e}")
         raise HTTPException(status_code=500, detail=f"Error sending OSC message: {e}")
+
+def toggle_layer(layer: int, on: bool = True):
+    """
+    Turn a layer on or off in Resolume
+    
+    If on=False, triggers the empty clip in column 1 to effectively stop the layer
+    """
+    if not client:
+        raise HTTPException(status_code=500, detail="OSC client not initialized")
+    
+    try:
+        if on:
+            # Turn on the layer
+            message = f"/composition/layers/{layer}/connect"
+            value = 1
+            print(f"Sending OSC message: {message} with value: {value}")
+            client.send_message(message, value)
+            print(f"Successfully activated layer {layer}")
+        else:
+            # To stop/clear a layer, trigger the empty clip in column 1
+            message = f"/composition/layers/{layer}/clips/1/connect"
+            value = 1
+            print(f"Sending OSC message: {message} with value: {value} (to clear the layer)")
+            client.send_message(message, value)
+            print(f"Successfully cleared layer {layer} by triggering empty column 1")
+    except Exception as e:
+        print(f"Error toggling layer: {e}")
+        raise HTTPException(status_code=500, detail=f"Error toggling layer: {e}")
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -237,36 +289,37 @@ async def get_queue():
 @app.post("/play-all")
 async def play_all_videos(request: PlayAllRequest):
     """
-    Play multiple videos in different layers with a 5-second interval
+    Play videos in sequence according to the choreography:
+    1. Play intro video in layer 1 for 1m7s (67 seconds)
+    2. Then play queued videos one by one in layer 2, each for 28 seconds
+    3. After each video plays in layer 2, move it to the first available layer (3-8)
+    4. After all videos have played, turn off layer 2 but keep others running
     """
+    global current_play_task
+    
     try:
         print(f"Received request to play {len(request.videos)} videos")
-        for i, video in enumerate(request.videos):
-            print(f"\nProcessing video {i+1}:")
-            print(f"Name: {video.name}")
-            print(f"Challenge Point: {video.challenge_point}")
-            print(f"Envi State: {video.envi_state}")
-            print(f"Video: {video.video}")
-            print(f"Channel: {video.channel}")
-            print(f"Layer: {video.index + 1}")
-            
-            # Trigger video in the specified layer
-            trigger_video(
-                video.video,
-                video.name,
-                video.challenge_point,
-                video.envi_state,
-                video.index + 1,  # Layer numbers start at 1
-                video.channel
-            )
-            # Wait 5 seconds before triggering the next video
-            if i < len(request.videos) - 1:  # Don't wait after the last video
-                print("Waiting 5 seconds before next video...")
-                time.sleep(5)
+        videos = request.videos
+        
+        if len(videos) > 6:
+            raise HTTPException(status_code=422, detail="Maximum 6 videos allowed")
+        
+        # Cancel any currently running task first
+        if current_play_task and not current_play_task.done():
+            print("Cancelling previous play sequence")
+            current_play_task.cancel()
+            try:
+                await current_play_task
+            except asyncio.CancelledError:
+                print("Previous play sequence cancelled")
+        
+        # Start a background task to handle the sequence
+        # This allows the API to return immediately while videos continue to play
+        current_play_task = asyncio.create_task(play_video_sequence(videos))
         
         return {
             "status": "success",
-            "message": "All videos triggered successfully"
+            "message": "All videos triggered successfully in sequence"
         }
     except ValidationError as e:
         print(f"Validation error: {e}")
@@ -274,6 +327,129 @@ async def play_all_videos(request: PlayAllRequest):
     except Exception as e:
         print(f"Error in play_all_videos: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+async def play_video_sequence(videos):
+    """
+    Handle the sequence of video playback in a background task
+    
+    Timing:
+    1. Play intro video in layer 1 for 1m7s (67 seconds)
+    2. Then play queued videos one by one in layer 2, each for 28 seconds
+    3. After each video plays in layer 2, move it to the first available layer (3-8)
+    4. After all videos have played, keep them running in layers 3-8 for 30 more seconds
+    """
+    try:
+        # STEP 1: Play intro video in layer 1 (clip 2)
+        print("Starting intro video in layer 1")
+        # Trigger the intro video in layer 1, clip 2
+        client.send_message("/composition/layers/1/clips/2/connect", 1)  
+        
+        # STEP 2: Wait for 1m7s (67 seconds) before starting first queued video
+        print(f"Waiting 1m7s (67 seconds) for intro video...")
+        
+        # Check for cancellation during the 67-second wait
+        for _ in range(67):
+            # Check if task was cancelled
+            if asyncio.current_task().cancelled():
+                print("Play sequence task was cancelled - stopping")
+                return
+            await asyncio.sleep(1)
+            
+        print("Intro video complete, starting queued videos")
+        
+        # Track which layers (3-8) are already used
+        used_layers = set()
+        
+        for i, video in enumerate(videos):
+            # Check for cancellation
+            if asyncio.current_task().cancelled():
+                print("Play sequence task was cancelled - stopping")
+                return
+                
+            print(f"\nProcessing video {i+1}:")
+            print(f"Name: {video.name}")
+            print(f"Challenge Point: {video.challenge_point}")
+            print(f"Envi State: {video.envi_state}")
+            print(f"Video: {video.video}")
+            print(f"Channel: {video.channel}")
+            
+            # Trigger video in layer 2
+            trigger_video(
+                video.video,
+                video.name,
+                video.challenge_point,
+                video.envi_state,
+                2,  # Always use layer 2 for initial playback
+                video.channel
+            )
+            
+            # Wait 28 seconds
+            print(f"Waiting 28 seconds for video {i+1} in layer 2...")
+            
+            # Check for cancellation during the 28-second wait
+            for _ in range(28):
+                if asyncio.current_task().cancelled():
+                    print("Play sequence task was cancelled - stopping")
+                    return
+                await asyncio.sleep(1)
+                
+            print(f"Video {i+1} complete in layer 2")
+            
+            # Find the first available layer in range 3-8
+            target_layer = None
+            for layer in range(3, 9):
+                if layer not in used_layers:
+                    target_layer = layer
+                    used_layers.add(layer)
+                    break
+                    
+            # Move the video to the target layer if one was found
+            if target_layer:
+                print(f"Moving video {i+1} from layer 2 to layer {target_layer}")
+                trigger_video(
+                    video.video,
+                    video.name,
+                    video.challenge_point,
+                    video.envi_state,
+                    target_layer,
+                    video.channel
+                )
+            else:
+                print("No available layers left (3-8 are all used)")
+        
+        # After all videos, turn off layer 2 (square)
+        print("All videos processed, turning off layer 2 (square)")
+        toggle_layer(2, False)
+        
+        # Keep videos running for 30 more seconds in layers 3-8
+        print("Keeping videos running for 30 more seconds in layers 3-8...")
+        
+        # Check for cancellation during the 30-second wait
+        for _ in range(30):
+            if asyncio.current_task().cancelled():
+                print("Play sequence task was cancelled - stopping")
+                return
+            await asyncio.sleep(1)
+                
+        print("30 seconds passed, turning off all video layers")
+        
+        # Now turn off all the group layers (3-8)
+        for layer in used_layers:
+            print(f"Turning off layer {layer}")
+            toggle_layer(layer, False)
+            
+        print("All videos complete. Experience finished.")
+        
+    except asyncio.CancelledError:
+        print("Play sequence task was cancelled - exiting")
+        raise
+    except Exception as e:
+        print(f"Error in play_video_sequence: {e}")
+        # Try to turn off layer 2 in case of error
+        try:
+            toggle_layer(2, False)
+        except:
+            pass
 
 @app.post("/needs_help", response_model=dict)
 async def needs_help_endpoint(request: HelpRequest):
@@ -316,6 +492,108 @@ async def help_status():
         "help_user": help_user,
         "message": f"{help_user} NEEDS HELP" if help_needed else "No help needed"
     }
+
+@app.post("/stop-all")
+async def stop_all_videos():
+    """
+    Stop all videos, show splash screen in layer 1 (composition),
+    and cancel any running play sequence.
+    The frontend will handle clearing the slots.
+    """
+    global current_play_task
+    
+    try:
+        print("Stopping all videos and cancelling play sequence")
+        
+        # Cancel the current play task if it exists and is running
+        if current_play_task and not current_play_task.done():
+            print("Cancelling running play sequence task")
+            current_play_task.cancel()
+            try:
+                # Wait for the task to be cancelled (with a timeout)
+                await asyncio.wait_for(asyncio.shield(current_play_task), 2.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                print("Play sequence task cancelled or timeout occurred")
+            current_play_task = None
+        
+        # Clear all layers 3-8 by triggering their empty column 1
+        for layer in range(3, 9):
+            try:
+                # Clear this layer
+                print(f"Clearing layer {layer} by triggering empty column 1")
+                toggle_layer(layer, False)
+            except Exception as e:
+                print(f"Error clearing layer {layer}: {e}")
+        
+        # Clear layer 2 (square)
+        print("Clearing layer 2 (square) by triggering empty column 1")
+        toggle_layer(2, False)
+        
+        # For layer 1, trigger the splash screen which is in column 1
+        print("Triggering splash screen in layer 1 (composition) at column 1")
+        client.send_message("/composition/layers/1/clips/1/connect", 1)
+        
+        # Clear any text overlay in composition
+        set_text_overlay("", 1)
+        
+        return {
+            "status": "success",
+            "message": "All videos stopped and play sequence cancelled"
+        }
+    except Exception as e:
+        print(f"Error stopping videos: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/restart")
+async def restart_turning_point():
+    """
+    Restart the Turning Point - clear videos and show splash screen
+    but without deleting the names from the slots.
+    The frontend will leave slot contents intact.
+    """
+    global current_play_task
+    
+    try:
+        print("Restarting Turning Point (clearing layers without affecting slots)")
+        
+        # Cancel the current play task if it exists and is running
+        if current_play_task and not current_play_task.done():
+            print("Cancelling running play sequence task")
+            current_play_task.cancel()
+            try:
+                # Wait for the task to be cancelled (with a timeout)
+                await asyncio.wait_for(asyncio.shield(current_play_task), 2.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                print("Play sequence task cancelled or timeout occurred")
+            current_play_task = None
+        
+        # Clear all layers 3-8 by triggering their empty column 1
+        for layer in range(3, 9):
+            try:
+                # Clear this layer
+                print(f"Clearing layer {layer} by triggering empty column 1")
+                toggle_layer(layer, False)
+            except Exception as e:
+                print(f"Error clearing layer {layer}: {e}")
+        
+        # Clear layer 2 (square)
+        print("Clearing layer 2 (square) by triggering empty column 1")
+        toggle_layer(2, False)
+        
+        # For layer 1, trigger the splash screen which is in column 1
+        print("Triggering splash screen in layer 1 (composition) at column 1")
+        client.send_message("/composition/layers/1/clips/1/connect", 1)
+        
+        # Clear any text overlay in composition
+        set_text_overlay("", 1)
+        
+        return {
+            "status": "success",
+            "message": "Turning Point restarted (keeping slot contents intact)"
+        }
+    except Exception as e:
+        print(f"Error restarting: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
