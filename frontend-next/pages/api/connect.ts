@@ -380,6 +380,7 @@ async function attemptRunPodLaunch(
   
   // Get Whisper device configuration
   const SPHINX_WHISPER_DEVICE = process.env.SPHINX_WHISPER_DEVICE || 'cuda';
+  const SPHINX_REPO_ID = process.env.SPHINX_REPO_ID || '';
   
   // Unique identifier for this instance
   const IDENTIFIER = `pod-${uuidv4()}`;
@@ -443,7 +444,7 @@ async function attemptRunPodLaunch(
                 { key: "CLOUDWATCH_LOG_GROUP", value: "${escapeValue(CLOUDWATCH_LOG_GROUP)}" },
                 { key: "SPHINX_WHISPER_DEVICE", value: "${escapeValue(SPHINX_WHISPER_DEVICE)}" },
                 { key: "SPHINX_MOUNT_POINT", value: "/workspace" },
-                { key: "SPHINX_REPO_ID", value: "Systran/faster-whisper-medium" },
+                { key: "SPHINX_REPO_ID", value: "${escapeValue(SPHINX_REPO_ID)}" },
               ]
             }
           ) {

@@ -162,8 +162,8 @@ async def run_bot(room_url, token, identifier, data=None):
     model_path = None
     
     if mount_point and repo_id:
-        # Format the full model path
-        model_path = os.path.join(mount_point, "models", "whisper-medium-ct2")
+        # Format the full model path, extract the model name from the repo ID
+        model_path = os.path.join(mount_point, "models", repo_id.split('/')[-1])
         logger.info(f"Using mount point for Whisper model: {mount_point}")
         logger.info(f"Hugging Face repo ID: {repo_id}")
         logger.info(f"Full model path: {model_path}")
