@@ -57,8 +57,8 @@ FLOW_STATES = {
         "suggested_language": "Welcome Seeker. To begin your quest, we invite you to ground and center with a few deep breaths. Know that you are safe here in your center. You're doing great! When you are ready to begin, please say 'I am ready'.",
     },
     "collect_name": {
-        "task": "Ask the user for their name and record it with the collect_name function, then ask for confirmation with the confirm_name function. If the user does not share a name, gently keep returning to the task of getting their name. Do not go deeper into the conversation before moving on from this stage. If they dont share a name after 2 attempt, please call the guide_assistance function.",
-        "suggested_language": "Before we get started, please tell me your name?",
+        "task": "Ask the user for their name (either burner name or default name) and record it with the collect_name function, then ask for confirmation with the confirm_name function. If the user does not share a name, gently keep returning to the task of getting their name. Do not go deeper into the conversation before moving on from this stage. If they dont share a name after 2 attempt, please call the guide_assistance function.",
+        "suggested_language": "Before we get started, please tell me your name? This can be your burner name or your default name, or just any odd noise you like.",
     },
     "identify_challenge": {
         "task": """Available Challenges: Fearful, Anxious, Stagnant, Ruminating, Disassociated, Numb, Unhealthy, Scarcity, Excluded, Lack of Control, Lack of Agency, Disembodied, Ungrounded, Obsessed, Silenced, Unheard, Lack of Purpose, Unmotivated, Shameful.
@@ -498,9 +498,18 @@ def create_identify_empowered_state_node(flow_manager: FlowManager=None)->NodeCo
         ],
         "task_messages": [
             {"role": "system", "content": f"""Follow this process in order:
-1. First, ask the participant about their desired empowered state and try to understand it through conversation. You have EXACTLY 2 attempts to match their response to one of the available empowered states. After 2 attempts, you MUST move to step 2.
-2. If after 2 attempts you still cannot match their response to an empowered state, direct them to look at the poster of empowered states and ask them to tell you which one resonates with them.
-3. Only if they still have trouble selecting an empowered state after looking at the poster, call the empowered_state_guide_assistance function.
+
+    1.  1. First, ask the participant about their desired empowered state and try to understand it through conversation. 
+             IMPORTANT: DO NOT present the list of empowered states untill you have allowed the user to speak freely about their empowered state. You have EXACTLY 2 attempts to match their response to one of the available empowered states. Only after 2 attempts, you can suggest the available empowered states options firectly.   
+             Analyze their response as a therapist would:
+           - Look for themes, emotions, and qualities they're describing
+           - Match their described qualities to one of the available empowered states. The pick must string match one of the available empowered states verbatim (not case sensitive)`). 
+           - Use the identify_challenge function to validate your pick
+           - If the participant doesn't mention any of the challenges, pick the most relevant one based on the conversation
+           - You have EXACTLY 2 attempts to match their response to one of the available challenges. Only after 2 attempts, you can present the list of empowered states.
+        
+          
+2. If you still cannot match their response to an empowered state or if the user is having issues, call the empowered_state_guide_assistance function.
 
 IMPORTANT: 
 - You MUST move to step 2 after exactly 2 attempts, regardless of the participant's response.
