@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, validator, ValidationError, Field
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
 import os
 from collections import deque
 import asyncio
@@ -51,11 +51,15 @@ def create_osc_client():
         return None
 
 # Input models
+class EmotionItem(BaseModel):
+    name: str
+    score: float
+
 class VideoRequest(BaseModel):
     name: str
     challenge_point: str
     envi_state: str
-    emotions: Dict[str, float]
+    emotions: Union[Dict[str, float], List[EmotionItem]]
 
 class PlayRequest(BaseModel):
     index: int
@@ -254,8 +258,17 @@ async def trigger_video_endpoint(request: VideoRequest):
     """
     Endpoint to add a video request to the queue or first available slot
     """
-    # Find matching video
-    matching_video = find_matching_video(request.envi_state, request.emotions)
+    # Convert emotions to dictionary format if it's in list format
+    emotions_dict = {}
+    if isinstance(request.emotions, list):
+        print("Converting emotions from list format to dictionary format")
+        for emotion in request.emotions:
+            emotions_dict[emotion.name] = emotion.score
+    else:
+        emotions_dict = request.emotions
+
+    # Find matching video using the dictionary format
+    matching_video = find_matching_video(request.envi_state, emotions_dict)
     
     if not matching_video:
         raise HTTPException(status_code=404, detail="No matching video found")

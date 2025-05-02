@@ -21,26 +21,27 @@ SYSTEM_ROLE = """"You are Sphinx, a therapeutic guide helping users explore stuc
     8. Never deviate from the task at hand or generate simulated responses"""
 
 CHALLENGE_TO_EMPOWERED_STATES = {
-    "fearful": ["Confident", "Experimental and Risking", "Courageous", "Leadership"],
-    "anxious": ["Confident", "Experimental and Risking", "Courageous", "Leadership"],
-    "stagnant": ["Experimental and Risking", "Spontaneous and Decisive", "Enthusiastic"],
-    "ruminating": ["Experimental and Risking", "Spontaneous and Decisive", "Enthusiastic"],
-    "disassociated": ["Engaged", "Curious", "Feeling Empathetic"],
-    "numb": ["Engaged", "Curious", "Feeling Empathetic"],
+    "fearful": ["Confident", "Risking", "Leadership"],
+    "anxious": ["Confident", "Risking", "Leadership"],
+    "stagnant": ["Risking", "Spontaneous", "Enthusiastic"],
+    "ruminating": ["Risking", "Spontaneous", "Enthusiastic"],
+    "disassociated": ["Engaged", "Curious", "Empathetic"],
+    "numb": ["Engaged", "Curious", "Empathetic"],
     "unhealthy": ["Full Capacity", "Energetic", "Honoring Body"],
-    "scarcity": ["Generous and Giving", "Indulging in Pleasure", "Investing", "Experimental and Risking"],
-    "excluded": ["Respected", "Trusting Others", "Leadership", "Receiving", "Communing with a group"],
-    "lack of control": ["Experimental and Risking", "Accepting Change", "Trusting Others", "Leadership", "Relaxed"],
-    "lack of agency": ["Experimental and Risking", "Accepting Change", "Trusting Others", "Leadership", "Relaxed"],
-    "disembodied": ["Honoring Body", "Joyful physical expression", "Focused Clarity", "Enthusiastic"],
-    "ungrounded": ["Honoring Body", "Joyful physical expression", "Focused Clarity", "Enthusiastic"],
+    "scarcity": ["Indulging In Pleasure", "Investing", "Risking"],
+    "excluded": ["Respected", "Trusting Others", "Leadership", "Recieving", "Communing"],
+    "lack of control": ["Risking", "Accepting Change", "Trusting Others", "Leadership", "Relaxed"],
+    "lack of agency": ["Risking", "Accepting Change", "Trusting Others", "Leadership", "Relaxed"],
+    "disembodied": ["Honoring Body", "Joyful Physical Expression", "Focused Clarity", "Enthusiastic"],
+    "ungrounded": ["Honoring Body", "Joyful Physical Expression", "Focused Clarity", "Enthusiastic"],
     "obsessed": ["Relaxed", "Accepting Change", "Experimental"],
-    "silenced": ["Leadership", "Confident", "Receiving"],
-    "unheard": ["Leadership", "Confident", "Receiving"],
+    "silenced": ["Leadership", "Confident", "Recieving"],
+    "unheard": ["Leadership", "Confident", "Recieving"],
     "lack of purpose": ["Enthusiastic", "Leadership", "Focused Clarity"],
     "unmotivated": ["Enthusiastic", "Leadership", "Focused Clarity"],
-    "shameful": ["Self-Love and Pride", "Leadership", "Confident", "Honoring Body", "Receiving"]
+    "shameful": ["Self-Love", "Leadership", "Confident", "Honoring Body", "Recieving"]
 }
+
 
 FLOW_STATES = {
     "greeting": {
