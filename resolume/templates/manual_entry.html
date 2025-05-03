@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manual Participant Entry</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f1ede9;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        select {
+            height: 40px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .status.success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .status.error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .back-link {
+            display: block;
+            margin-top: 20px;
+            text-align: center;
+            color: #2196F3;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Manual Participant Entry</h1>
+        
+        <form id="manualEntryForm">
+            <div class="form-group">
+                <label for="name">Participant Name:</label>
+                <input type="text" id="name" name="name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="challenge_point">Challenge Point:</label>
+                <select id="challenge_point" name="challenge_point" required>
+                    <option value="">Select a Challenge Point</option>
+                    <option value="Fearful">Fearful</option>
+                    <option value="Anxious">Anxious</option>
+                    <option value="Stagnant">Stagnant</option>
+                    <option value="Ruminating">Ruminating</option>
+                    <option value="Disassociated">Disassociated</option>
+                    <option value="Numb">Numb</option>
+                    <option value="Unhealthy">Unhealthy</option>
+                    <option value="Scarcity">Scarcity</option>
+                    <option value="Excluded">Excluded</option>
+                    <option value="Lack of Control">Lack of Control</option>
+                    <option value="Lack of Agency">Lack of Agency</option>
+                    <option value="Disembodied">Disembodied</option>
+                    <option value="Ungrounded">Ungrounded</option>
+                    <option value="Obsessed">Obsessed</option>
+                    <option value="Silenced">Silenced</option>
+                    <option value="Unheard">Unheard</option>
+                    <option value="Lack of Purpose">Lack of Purpose</option>
+                    <option value="Unmotivated">Unmotivated</option>
+                    <option value="Shameful">Shameful</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="envi_state">Empowered State:</label>
+                <select id="envi_state" name="envi_state" required>
+                    <option value="">Select an Empowered State</option>
+                    <option value="Confident">Confident</option>
+                    <option value="Risking">Risking</option>
+                    <option value="Leadership">Leadership</option>
+                    <option value="Spontaneous">Spontaneous</option>
+                    <option value="Enthusiastic">Enthusiastic</option>
+                    <option value="Engaged">Engaged</option>
+                    <option value="Curious">Curious</option>
+                    <option value="Empathetic">Empathetic</option>
+                    <option value="Full Capacity">Full Capacity</option>
+                    <option value="Energetic">Energetic</option>
+                    <option value="Honoring Body">Honoring Body</option>
+                    <option value="Indulging In Pleasure">Indulging In Pleasure</option>
+                    <option value="Investing">Investing</option>
+                    <option value="Respected">Respected</option>
+                    <option value="Trusting Others">Trusting Others</option>
+                    <option value="Recieving">Recieving</option>
+                    <option value="Communing">Communing</option>
+                    <option value="Accepting Change">Accepting Change</option>
+                    <option value="Relaxed">Relaxed</option>
+                    <option value="Joyful Physical Expression">Joyful Physical Expression</option>
+                    <option value="Focused Clarity">Focused Clarity</option>
+                    <option value="Experimental">Experimental</option>
+                    <option value="Self-Love">Self-Love</option>
+                </select>
+            </div>
+            
+            <button type="submit">Add Participant to Queue</button>
+        </form>
+        
+        <div id="status" class="status"></div>
+        
+        <a href="/" class="back-link">Back to Main Controller</a>
+    </div>
+
+    <script>
+        document.getElementById('manualEntryForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('name').value;
+            const challenge_point = document.getElementById('challenge_point').value;
+            const envi_state = document.getElementById('envi_state').value;
+            
+            const status = document.getElementById('status');
+            
+            if (!name || !challenge_point || !envi_state) {
+                status.textContent = 'Please fill in all fields';
+                status.className = 'status error';
+                status.style.display = 'block';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/manual_entry', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        challenge_point: challenge_point,
+                        envi_state: envi_state
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    status.textContent = `Success! Participant added to queue position ${data.queue_position}`;
+                    status.className = 'status success';
+                    status.style.display = 'block';
+                    
+                    // Clear form
+                    document.getElementById('name').value = '';
+                    document.getElementById('challenge_point').value = '';
+                    document.getElementById('envi_state').value = '';
+                } else {
+                    status.textContent = `Error: ${data.detail || 'Unknown error'}`;
+                    status.className = 'status error';
+                    status.style.display = 'block';
+                }
+            } catch (error) {
+                status.textContent = `Error: ${error.message}`;
+                status.className = 'status error';
+                status.style.display = 'block';
+            }
+        });
+        
+        // Update empowered state options based on challenge point selection
+        document.getElementById('challenge_point').addEventListener('change', function() {
+            const challenge = this.value;
+            const enviStateSelect = document.getElementById('envi_state');
+            
+            // Reset the empowered state dropdown
+            enviStateSelect.innerHTML = '<option value="">Select an Empowered State</option>';
+            
+            // Define mappings from challenges to empowered states
+            const empoweredStateMap = {
+                'Fearful': ['Confident', 'Risking', 'Leadership'],
+                'Anxious': ['Confident', 'Risking', 'Leadership'],
+                'Stagnant': ['Risking', 'Spontaneous', 'Enthusiastic'],
+                'Ruminating': ['Risking', 'Spontaneous', 'Enthusiastic'],
+                'Disassociated': ['Engaged', 'Curious', 'Empathetic'],
+                'Numb': ['Engaged', 'Curious', 'Empathetic'],
+                'Unhealthy': ['Full Capacity', 'Energetic', 'Honoring Body'],
+                'Scarcity': ['Indulging In Pleasure', 'Investing', 'Risking'],
+                'Excluded': ['Respected', 'Trusting Others', 'Leadership', 'Recieving', 'Communing'],
+                'Lack of Control': ['Risking', 'Accepting Change', 'Trusting Others', 'Leadership', 'Relaxed'],
+                'Lack of Agency': ['Risking', 'Accepting Change', 'Trusting Others', 'Leadership', 'Relaxed'],
+                'Disembodied': ['Honoring Body', 'Joyful Physical Expression', 'Focused Clarity', 'Enthusiastic'],
+                'Ungrounded': ['Honoring Body', 'Joyful Physical Expression', 'Focused Clarity', 'Enthusiastic'],
+                'Obsessed': ['Relaxed', 'Accepting Change', 'Experimental'],
+                'Silenced': ['Leadership', 'Confident', 'Recieving'],
+                'Unheard': ['Leadership', 'Confident', 'Recieving'],
+                'Lack of Purpose': ['Enthusiastic', 'Leadership', 'Focused Clarity'],
+                'Unmotivated': ['Enthusiastic', 'Leadership', 'Focused Clarity'],
+                'Shameful': ['Self-Love', 'Leadership', 'Confident', 'Honoring Body', 'Recieving']
+            };
+            
+            // If a challenge is selected, add its empowered states
+            if (challenge && empoweredStateMap[challenge]) {
+                empoweredStateMap[challenge].forEach(state => {
+                    const option = document.createElement('option');
+                    option.value = state;
+                    option.textContent = state;
+                    enviStateSelect.appendChild(option);
+                });
+            } else {
+                // If no specific challenge or the challenge isn't in our map, show all options
+                const allStates = [
+                    'Confident', 'Risking', 'Leadership', 'Spontaneous', 'Enthusiastic',
+                    'Engaged', 'Curious', 'Empathetic', 'Full Capacity', 'Energetic',
+                    'Honoring Body', 'Indulging In Pleasure', 'Investing', 'Respected',
+                    'Trusting Others', 'Recieving', 'Communing', 'Accepting Change', 'Relaxed',
+                    'Joyful Physical Expression', 'Focused Clarity', 'Experimental', 'Self-Love'
+                ];
+                
+                allStates.forEach(state => {
+                    const option = document.createElement('option');
+                    option.value = state;
+                    option.textContent = state;
+                    enviStateSelect.appendChild(option);
+                });
+            }
+        });
+    </script>
+</body>
+</html> 
