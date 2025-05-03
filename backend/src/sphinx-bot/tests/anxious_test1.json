@@ -5,13 +5,13 @@
     {"text": "Yes", "node": "collect_name"},
     {"text": "I feel on the edge all the time. A bit afraid of my future. I don't know what I'm going to do and I just stay home.", "node": "identify_challenge"},
     {"text": "Yes", "node": "confirm_challenge"},
-    {"text": "I’d feel a bit more relaxed, go visit the world. I also dream of starting a business and making a lot of money.", "node": "identify_empowered_state", 
+    {"text": "I’d feel a bit more relaxed, go visit the world. I also dream of starting a business and making a lot of money.", "node": "record_empowered_state", 
     "flow_manager_state" : {
         "emotions_summary": "Relief, Contentment, Excitement", 
         "emotions_fully_processed": true,
         "combined_emotions": [{"name": "Anxiety", "score": 0.13485392939299345}, {"name": "Fear", "score": 0.10485392939299345}]
     }},
-    {"text": "Yes", "node": "confirm_empowered_state"},
+    {"text": "Yes", "node": "identify_and_confirm_empowered_state"},
     {"text": "goodbye", "node": "goodbye"}
 ],
     "expected_empowered_states" : ["Confident", "Experimental and Risking", "Courageous", "Leadership"]

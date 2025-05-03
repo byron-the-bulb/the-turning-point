@@ -5,7 +5,7 @@
     {"text": "Yes", "node": "collect_name"},
     {"text": "I feel like I don't have enough money to live a comfortable life. I'm always worried about running out of money. I always feel I don't have enough and I have a hard time sharing.", "node": "identify_challenge"},
     {"text": "Yes", "node": "confirm_challenge"},
-    {"text": "I see myself being happy with whatever money I have. I will be contributing to a community I care about and make a difference without worrying about myself. ", "node": "identify_empowered_state", 
+    {"text": "I see myself being happy with whatever money I have. I will be contributing to a community I care about and make a difference without worrying about myself. ", "node": "record_empowered_state", 
     "flow_manager_state" : {"emotions_summary": "Relief, Contentment, Excitement", "emotions_fully_processed": true,
     "combined_emotions": [
             {
@@ -194,7 +194,7 @@
             }
         ]
     }},
-    {"text": "Yes", "node": "confirm_empowered_state"},
+    {"text": "Yes", "node": "identify_and_confirm_empowered_state"},
     {"text": "goodbye", "node": "goodbye"}
 ],
     "expected_empowered_states" : ["Generous and Giving", "Indulging in Pleasure", "Investing", "Experimental and Risking"]
