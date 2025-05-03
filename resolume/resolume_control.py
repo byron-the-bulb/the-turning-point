@@ -59,7 +59,7 @@ class VideoRequest(BaseModel):
     name: str
     challenge_point: str
     envi_state: str
-    emotions: Union[Dict[str, float], List[EmotionItem]]
+    emotions: Union[Dict[str, float], List[EmotionItem]] = {}
 
 class PlayRequest(BaseModel):
     index: int
@@ -126,12 +126,23 @@ def find_matching_video(envi_state: str, emotions: Dict[str, float]) -> Optional
     # Normalize the input envi_state
     input_envi_state = envi_state.lower().strip()
     
+    # Track exact matches for fallback when emotions are empty
+    exact_match_videos = []
+    
     for video in metadata:
         # Normalize the video's envi_state
         video_envi_state = video['EnviState'].lower().strip()
         
         # Check for exact match or contains match
         if input_envi_state == video_envi_state or input_envi_state in video_envi_state or video_envi_state in input_envi_state:
+            # For exact matches, add to exact_match_videos list
+            if input_envi_state == video_envi_state:
+                exact_match_videos.append(video['Filename'])
+            
+            # If emotions dict is empty, skip score calculation
+            if not emotions:
+                continue
+                
             # Calculate emotion match score
             score = 0
             for emotion, value in emotions.items():
@@ -147,6 +158,21 @@ def find_matching_video(envi_state: str, emotions: Dict[str, float]) -> Optional
                 best_match = video['Filename']
     
     print(f"Looking for video matching '{input_envi_state}'")
+    
+    # If no match found based on emotions but we have exact envi_state matches, use the first one
+    if not best_match and exact_match_videos:
+        best_match = exact_match_videos[0]
+        print(f"Using exact EnviState match: {best_match} (no emotions provided)")
+    # If still no match but we have metadata, just use the first video with matching envi_state
+    elif not best_match and metadata:
+        # Find any video with a similar envi_state
+        for video in metadata:
+            video_envi_state = video['EnviState'].lower().strip()
+            if input_envi_state in video_envi_state or video_envi_state in input_envi_state:
+                best_match = video['Filename']
+                print(f"Using partial EnviState match: {best_match} (no exact match found)")
+                break
+    
     if best_match:
         print(f"Found match: {best_match}")
     else:
@@ -254,51 +280,92 @@ async def help_monitor(request: Request):
     return templates.TemplateResponse("help_status.html", {"request": request})
 
 @app.post("/trigger_video")
-async def trigger_video_endpoint(request: VideoRequest):
+async def trigger_video_endpoint(request: Request):
     """
     Endpoint to add a video request to the queue or first available slot
     """
-    # Convert emotions to dictionary format if it's in list format
-    emotions_dict = {}
-    if isinstance(request.emotions, list):
-        print("Converting emotions from list format to dictionary format")
-        for emotion in request.emotions:
-            emotions_dict[emotion.name] = emotion.score
-    else:
-        emotions_dict = request.emotions
-
-    # Find matching video using the dictionary format
-    matching_video = find_matching_video(request.envi_state, emotions_dict)
-    
-    if not matching_video:
-        raise HTTPException(status_code=404, detail="No matching video found")
-    
-    # Find the channel number based on alphabetical order
-    sorted_files = sorted([v['Filename'] for v in metadata])
     try:
-        channel = sorted_files.index(matching_video) + 1  # +1 because Resolume channels start at 1
-    except ValueError:
-        raise HTTPException(status_code=404, detail=f"Video {matching_video} not found in metadata")
-    
-    # Create the request object
-    request_data = {
-        "name": request.name,
-        "challenge_point": request.challenge_point,
-        "envi_state": request.envi_state,
-        "video": matching_video,
-        "channel": channel
-    }
-    
-    # Add request to queue
-    request_queue.append(request_data)
-    
-    return {
-        "status": "success",
-        "message": "Request added to queue",
-        "queue_position": len(request_queue),
-        "video": matching_video,
-        "channel": channel
-    }
+        # Get the raw request body
+        body = await request.json()
+        print(f"DEBUG - Raw request body: {body}")
+        
+        # Manually validate the required fields
+        if "envi_state" not in body:
+            print(f"ERROR - Missing required field: envi_state")
+            raise HTTPException(status_code=422, detail="Missing required field: envi_state")
+            
+        # Set defaults for optional fields
+        if "name" not in body:
+            body["name"] = ""
+        if "challenge_point" not in body:
+            body["challenge_point"] = ""
+        if "emotions" not in body:
+            body["emotions"] = {}
+            
+        # Now create the VideoRequest object
+        try:
+            request_data = VideoRequest(**body)
+        except ValidationError as e:
+            print(f"ERROR - Validation error: {e}")
+            raise HTTPException(status_code=422, detail=f"Validation error: {e}")
+            
+        print(f"DEBUG - Parsed request: name={request_data.name}, challenge_point={request_data.challenge_point}, envi_state={request_data.envi_state}")
+        print(f"DEBUG - Emotions data: {request_data.emotions}")
+        
+        # Convert emotions to dictionary format if it's in list format
+        emotions_dict = {}
+        if isinstance(request_data.emotions, list):
+            print("Converting emotions from list format to dictionary format")
+            for emotion in request_data.emotions:
+                emotions_dict[emotion.name] = emotion.score
+        else:
+            emotions_dict = request_data.emotions
+
+        print(f"Using emotions: {emotions_dict}")
+        
+        # Find matching video using the dictionary format
+        matching_video = find_matching_video(request_data.envi_state, emotions_dict)
+        
+        if not matching_video:
+            print(f"No matching video found for envi_state: {request_data.envi_state}, emotions: {emotions_dict}")
+            raise HTTPException(status_code=404, detail="No matching video found")
+        
+        # Find the channel number based on alphabetical order
+        sorted_files = sorted([v['Filename'] for v in metadata])
+        try:
+            channel = sorted_files.index(matching_video) + 1  # +1 because Resolume channels start at 1
+        except ValueError:
+            raise HTTPException(status_code=404, detail=f"Video {matching_video} not found in metadata")
+        
+        # Create the request object
+        queue_data = {
+            "name": request_data.name,
+            "challenge_point": request_data.challenge_point,
+            "envi_state": request_data.envi_state,
+            "video": matching_video,
+            "channel": channel
+        }
+        
+        # Add request to queue
+        request_queue.append(queue_data)
+        
+        print(f"Added to queue: {queue_data}")
+        
+        return {
+            "status": "success",
+            "message": "Request added to queue",
+            "queue_position": len(request_queue),
+            "video": matching_video,
+            "channel": channel
+        }
+    except HTTPException:
+        # Re-raise HTTP exceptions so they're handled properly
+        raise
+    except Exception as e:
+        print(f"ERROR - Unexpected error: {e}")
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
 @app.get("/queue")
 async def get_queue():
