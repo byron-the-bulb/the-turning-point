@@ -364,7 +364,7 @@ async def test_pipecat_flow(json_file_path):
             }
             
             # Resolume control server URL (using same default as frontend)
-            resolume_control_url = os.getenv("RESOLUME_CONTROL_URL", "http://localhost:8000")
+            resolume_control_url = os.getenv("RESOLUME_CONTROL_URL", "http://192.168.1.101:8000")
             
             logger.info(f"Resolume control payload: {payload}")
             response = requests.post(f"{resolume_control_url}/trigger_video", json=payload)

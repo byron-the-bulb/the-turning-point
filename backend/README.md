@@ -1,10 +1,10 @@
-# Sphinx Voice Bot
+# The Turning Point Voice Bot
 
-A voice-based conversational AI bot that provides guided conversations with real-time emotion analysis and feedback.
+A voice-based conversational AI bot that provides guided conversations with real-time emotion analysis and feedback, and drives a video display using Resolume.
 
 ## Overview
 
-Sphinx Voice Bot is a sophisticated conversational AI platform built on a modern architecture that combines real-time audio processing, emotion analysis, and guided conversation flows. The bot can be deployed as a Docker container and connects to users through Daily.co video/audio rooms.
+The Turning Point Voice Bot is a sophisticated conversational AI platform built on a modern architecture that combines real-time audio processing, emotion analysis, and guided conversation flows. The bot can be deployed as a Docker container and connects to users through Daily.co video/audio rooms.
 
 ## Installation and Usage
 
@@ -31,7 +31,7 @@ Alternatively, you can build manually:
 
 ```bash
 cd backend
-docker build -t sphinx-voice-bot .
+docker build -t turning-point-voice-bot .
 ```
 
 The build process:
