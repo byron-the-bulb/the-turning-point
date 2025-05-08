@@ -35,7 +35,42 @@ current_play_task = None
 def load_metadata():
     try:
         with open('video_metadata.json', 'r') as f:
-            return json.load(f)
+            data = json.load(f)
+            print(f"Loaded {len(data)} videos from metadata file")
+            return data
+    except FileNotFoundError:
+        print("Warning: video_metadata.json not found. Creating a basic version.")
+        
+        # Create a basic metadata file with one entry for each empowered state
+        empowered_states = [
+            "Confident", "Risking", "Leadership", "Spontaneous", "Enthusiastic",
+            "Engaged", "Curious", "Empathetic", "Full Capacity", "Energetic",
+            "Honoring Body", "Indulging In Pleasure", "Investing", "Respected",
+            "Trusting Others", "Recieving", "Communing", "Accepting Change", "Relaxed",
+            "Joyful Physical Expression", "Focused Clarity", "Experimental", "Self-Love"
+        ]
+        
+        basic_metadata = []
+        for i, state in enumerate(empowered_states):
+            basic_metadata.append({
+                "Filename": f"video_{i+1}.mp4",
+                "EnviState": state,
+                "joy": "0.5",
+                "fear": "0.5",
+                "anger": "0.5",
+                "sadness": "0.5",
+                "trust": "0.5"
+            })
+        
+        # Save the basic metadata file
+        try:
+            with open('video_metadata.json', 'w') as f:
+                json.dump(basic_metadata, f, indent=2)
+            print(f"Created basic metadata file with {len(basic_metadata)} entries")
+            return basic_metadata
+        except Exception as e:
+            print(f"Error creating basic metadata file: {e}")
+            return []
     except Exception as e:
         print(f"Error loading metadata: {e}")
         return []
@@ -60,6 +95,11 @@ class VideoRequest(BaseModel):
     challenge_point: str
     envi_state: str
     emotions: Union[Dict[str, float], List[EmotionItem]]
+
+class ManualEntryRequest(BaseModel):
+    name: str
+    challenge_point: str
+    envi_state: str
 
 class PlayRequest(BaseModel):
     index: int
@@ -122,6 +162,7 @@ def find_matching_video(envi_state: str, emotions: Dict[str, float]) -> Optional
     """
     best_match = None
     best_score = 0
+    fallback_match = None  # Added fallback match for when emotion matching fails
     
     # Normalize the input envi_state
     input_envi_state = envi_state.lower().strip()
@@ -132,25 +173,37 @@ def find_matching_video(envi_state: str, emotions: Dict[str, float]) -> Optional
         
         # Check for exact match or contains match
         if input_envi_state == video_envi_state or input_envi_state in video_envi_state or video_envi_state in input_envi_state:
+            # Store as fallback match - will use this if no emotion match is found
+            if fallback_match is None:
+                fallback_match = video['Filename']
+                
             # Calculate emotion match score
             score = 0
+            emotions_found = False
             for emotion, value in emotions.items():
                 if emotion in video and video[emotion] != ".":
                     try:
                         video_value = float(video[emotion])
                         score += 1 - abs(video_value - value)
+                        emotions_found = True
                     except (ValueError, TypeError):
                         continue
             
-            if score > best_score:
+            # Only update best match if we actually found emotions to match with
+            if emotions_found and score > best_score:
                 best_score = score
                 best_match = video['Filename']
     
-    print(f"Looking for video matching '{input_envi_state}'")
-    if best_match:
-        print(f"Found match: {best_match}")
+    # Use fallback match if no emotion-based match was found
+    if best_match is None and fallback_match is not None:
+        best_match = fallback_match
+        print(f"Using fallback match for '{input_envi_state}': {best_match}")
     else:
-        print("No match found")
+        print(f"Looking for video matching '{input_envi_state}'")
+        if best_match:
+            print(f"Found match: {best_match}")
+        else:
+            print("No match found")
     
     return best_match
 
@@ -252,6 +305,99 @@ async def help_monitor(request: Request):
     Display the Help Status Monitor page
     """
     return templates.TemplateResponse("help_status.html", {"request": request})
+
+@app.get("/manual_entry", response_class=HTMLResponse)
+async def manual_entry_page(request: Request):
+    """
+    Display the Manual Entry page for manually entering participant data
+    """
+    return templates.TemplateResponse("manual_entry.html", {"request": request})
+
+@app.post("/manual_entry")
+async def manual_entry(request: ManualEntryRequest):
+    """
+    Endpoint to manually add a participant to the queue without going through the Sphinx API
+    """
+    print(f"Manual entry received: {request}")
+    
+    # Debug: Print metadata structure
+    print(f"Metadata count: {len(metadata)}")
+    if len(metadata) > 0:
+        print(f"Sample metadata entry: {metadata[0]}")
+        print(f"Available envi_states: {[video['EnviState'] for video in metadata]}")
+    
+    # Create default emotions for video matching
+    # Using neutral emotions since we don't have emotion data from manual entry
+    default_emotions = {
+        "joy": 0.5,
+        "fear": 0.5,
+        "anger": 0.5,
+        "sadness": 0.5,
+        "disgust": 0.5,
+        "surprise": 0.5,
+        "trust": 0.5
+    }
+    
+    # Add all possible emotion keys that might be in the metadata
+    for video in metadata:
+        for key in video:
+            if key not in ['Filename', 'EnviState'] and key not in default_emotions:
+                try:
+                    # Only add it if it looks like a numeric value
+                    value = video[key]
+                    if value != '.' and float(value):
+                        default_emotions[key] = 0.5
+                except (ValueError, TypeError):
+                    pass
+    
+    print(f"Using emotion keys for matching: {list(default_emotions.keys())}")
+    
+    # Find matching video using the dictionary format
+    matching_video = find_matching_video(request.envi_state, default_emotions)
+    
+    if not matching_video:
+        print(f"No match found using emotions, trying direct envi_state match for: {request.envi_state}")
+        # Fallback: select first video that has matching envi_state
+        for video in metadata:
+            if request.envi_state.lower() in video['EnviState'].lower() or video['EnviState'].lower() in request.envi_state.lower():
+                matching_video = video['Filename']
+                print(f"Using direct fallback match: {matching_video}")
+                break
+    
+    if not matching_video and len(metadata) > 0:
+        # Last resort fallback: just use the first video in metadata
+        matching_video = metadata[0]['Filename']
+        print(f"No match found, using first video as fallback: {matching_video}")
+    
+    if not matching_video:
+        raise HTTPException(status_code=404, detail="No matching video found. Check if video_metadata.json exists and has entries.")
+    
+    # Find the channel number based on alphabetical order
+    sorted_files = sorted([v['Filename'] for v in metadata])
+    try:
+        channel = sorted_files.index(matching_video) + 1  # +1 because Resolume channels start at 1
+    except ValueError:
+        raise HTTPException(status_code=404, detail=f"Video {matching_video} not found in metadata")
+    
+    # Create the request object
+    request_data = {
+        "name": request.name,
+        "challenge_point": request.challenge_point,
+        "envi_state": request.envi_state,
+        "video": matching_video,
+        "channel": channel
+    }
+    
+    # Add request to queue
+    request_queue.append(request_data)
+    
+    return {
+        "status": "success",
+        "message": "Participant added to queue manually",
+        "queue_position": len(request_queue),
+        "video": matching_video,
+        "channel": channel
+    }
 
 @app.post("/trigger_video")
 async def trigger_video_endpoint(request: VideoRequest):

@@ -281,10 +281,36 @@
             font-size: 24px;
             margin-bottom: 10px;
         }
+        .nav-links {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            gap: 20px;
+        }
+        .nav-link {
+            background-color: rgba(23, 162, 184, 0.8);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+        }
+        .nav-link:hover {
+            background-color: rgba(23, 162, 184, 1);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
     </style>
 </head>
 <body>
     <h1>Turning Point Controller</h1>
+    
+    <!-- Navigation Links -->
+    <div class="nav-links">
+        <a href="/manual_entry" class="nav-link">Manual Participant Entry</a>
+        <a href="/help" class="nav-link">Help Status Monitor</a>
+    </div>
     
     <!-- Help notification panel -->
     <div id="helpNotification" class="help-notification help-needed">
