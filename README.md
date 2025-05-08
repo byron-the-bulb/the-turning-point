@@ -1,12 +1,12 @@
-# Sphinx Voice Bot
+# Turning Point Voice Bot
 
 A sophisticated conversational AI platform with real-time emotion analysis and guided conversations.
 
 ## Overview
 
-Sphinx Voice Bot combines cutting-edge voice processing, emotion analysis, and conversational AI to create an immersive and responsive voice interaction experience. The system analyzes users' emotional states in real-time while guiding them through transformative conversations.
+Turning Point Voice Bot combines cutting-edge voice processing, emotion analysis, and conversational AI to create an immersive and responsive voice interaction experience. The system analyzes users' emotional states in real-time while guiding them through transformative conversations.
 
-![Sphinx Voice Bot Architecture](https://placeholder-for-architecture-diagram.com)
+![Turning Point Voice Bot Architecture](./turning-point-architecture.png)
 
 ## Key Features
 
@@ -16,6 +16,7 @@ Sphinx Voice Bot combines cutting-edge voice processing, emotion analysis, and c
 - **Multi-platform** - Web interface with support for various devices
 - **GPU Acceleration** - High-performance processing using NVIDIA CUDA
 - **Multiple TTS Voices** - Choice of voice styles and emotions through various providers
+- **Resolume VJ Integration** - Control Resolume Arena/Avenue visual performances via OSC protocol based on conversation content and emotional states
 
 ## Project Structure
 
@@ -31,7 +32,7 @@ The backend is built with Python and uses FastAPI to provide an API for the fron
 
 ### Frontend (Next.js)
 
-The frontend is built with Next.js and React, providing a modern web interface for interacting with the Sphinx Voice Bot. It handles user authentication, audio streaming, and UI updates based on the conversation state.
+The frontend is built with Next.js and React, providing a modern web interface for interacting with the Turning Point Voice Bot. It handles user authentication, audio streaming, and UI updates based on the conversation state.
 
 - **Technologies**: Next.js, React, Daily.co SDK, Pipecat Client SDK
 - **Features**: Voice selection, emotion visualization, conversation history
@@ -81,9 +82,20 @@ npm run dev
 5. **Access the application**:
    Open [http://localhost:3000](http://localhost:3000) in your browser
 
+## Resolume VJ Integration
+
+The Turning Point Bot includes a dedicated module for controlling Resolume Arena/Avenue VJ software through OSC (Open Sound Control) protocol. This integration enables:
+
+- **Emotional Visualization** - Triggering visual scenes based on detected user emotions
+- **Real-time Parameter Control** - Adjusting opacity, speed, and other parameters of visual layers
+- **Conversation-Driven Visuals** - Automatic scene selection based on conversation topics and flow stages
+- **Synchronized Performance** - Precise timing between spoken content and visual elements
+
+The Resolume app component runs alongside the main bot and translates conversation states and emotional data into OSC messages that Resolume can understand and respond to in real-time.
+
 ## Architecture
 
-The Sphinx Voice Bot uses a modern, distributed architecture:
+The Turning Point Voice Bot uses a modern, distributed architecture:
 
 1. **User Interface Layer** (Frontend)
    - Next.js web application
@@ -108,11 +120,11 @@ The Sphinx Voice Bot uses a modern, distributed architecture:
 
 ## RunPod Execution
 
-RunPod provides GPU-accelerated infrastructure for deploying the Sphinx Voice Bot:
+RunPod provides GPU-accelerated infrastructure for deploying the Turning Point Voice Bot:
 
 ### How It Works
 
-1. **Template-based Deployment**: The system uses pre-configured RunPod templates with the Sphinx bot Docker image
+1. **Template-based Deployment**: The system uses pre-configured RunPod templates with the Turning Point bot Docker image
 2. **Dynamic Provisioning**: When a user connects to the frontend, the system:
    - Creates a Daily.co room for audio communication
    - Dynamically provisions a GPU-accelerated RunPod instance
