@@ -118,7 +118,7 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpe
             <div className={styles.messageHeader}>
               <span className={styles.messageType}>
                 {message.type === 'user' ? 'Participant' : 
-                 message.type === 'guide' ? 'Sphinx' : 
+                 message.type === 'guide' ? 'Turning Point' : 
                  message.type === 'system' ? 'System' :
                  message.type === 'emotion' ? 'Emotion Detection' : 'Status'}
               </span>

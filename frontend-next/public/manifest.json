@@ -1,6 +1,6 @@
 {
-  "name": "Sphinx Voice Bot",
-  "short_name": "Sphinx",
+  "name": "The Turning Point Voice Bot",
+  "short_name": "Turning Point",
   "description": "A voice bot with real-time emotion analysis and guided conversations",
   "start_url": "/",
   "display": "standalone",

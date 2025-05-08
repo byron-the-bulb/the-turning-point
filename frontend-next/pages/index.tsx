@@ -209,7 +209,7 @@ export default function Home() {
       console.log('Received transcription:', transcript);
       if (transcript.text) {
         addChatMessage(transcript.text, 'user');
-        setUIOverride(null);
+        //setUIOverride(null);
       }
     };
 
@@ -218,7 +218,7 @@ export default function Home() {
       setStatusText('Connected to server');
       setIsConnected(true);
       setIsConnecting(false);
-      addChatMessage('Connected to the Sphinx Voice Bot server', 'system');
+      addChatMessage('Connected to the Turning Point Voice Bot server', 'system');
       // We're now waiting for a participant to join
       setIsWaitingForParticipant(true);
     };
@@ -485,7 +485,7 @@ export default function Home() {
   // Send welcome message on mount
   useEffect(() => {
     if (!initialMessageSent.current) {
-      addChatMessage('Sphinx Voice Bot ready', 'system');
+      addChatMessage('Turning Point Voice Bot ready', 'system');
       initialMessageSent.current = true;
       console.log("Initial welcome message sent");
     }
@@ -494,14 +494,14 @@ export default function Home() {
   return (
     <div className={styles.container}>
       <Head>
-        <title>Sphinx Voice Bot</title>
-        <meta name="description" content="Sphinx Voice Bot Interface" />
+        <title>Turning Point Voice Bot</title>
+        <meta name="description" content="Turning Point Voice Bot Interface" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
       <main className={styles.main}>
         <h1 className={styles.title}>
-          Sphinx Voice Bot Interface
+          Turning Point Voice Bot Interface
         </h1>
         <h3><div id="statusText">{statusText}</div></h3>
 
@@ -612,7 +612,7 @@ export default function Home() {
         */}
 
         {(isConnecting || isWaitingForParticipant) && (
-          <LoadingSpinner message="Waiting for Sphinx to join..." />
+          <LoadingSpinner message="Waiting for Turning Point Voice Bot to join..." />
         )}
       </main>
     </div>

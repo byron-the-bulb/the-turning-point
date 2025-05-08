@@ -116,6 +116,7 @@
 
 .stationNameLabel {
   font-weight: bold;
+  color: black;
   margin-right: 1rem;
   font-size: 1rem;
 }
