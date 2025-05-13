@@ -42,7 +42,7 @@ from pipecat.transports.services.daily import DailyTransport, DailyParams
 from pipecat.services.whisper.stt import WhisperSTTService, Model
 from pipecat.processors.frameworks.rtvi import RTVIProcessor, RTVIConfig, RTVIObserver, RTVIMessage, RTVIAction, RTVIActionArgument,RTVIServerMessageFrame
 from pipecat_flows import FlowManager
-from sphinx_script_dynamic import SYSTEM_ROLE, create_initial_node
+from muse_script_dynamic import SYSTEM_ROLE, create_initial_node
 from status_utils import status_updater
 from custom_flow_manager import CustomFlowManager
 from pipecat.processors.frame_processor import FrameDirection

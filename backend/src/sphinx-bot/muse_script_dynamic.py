@@ -237,12 +237,7 @@ def create_not_connected_node() -> NodeConfig:
                 handler=greeting_ready_handler,
                 transition_callback=greeting_callback
             )
-        ],
-        "ui_override": {
-            "type": "button",
-            "prompt": "Check connection again?",
-            "action_text": "Check connection"
-        }
+        ]
     }
 
 
@@ -266,10 +261,5 @@ def create_initial_node()->NodeConfig:
                 handler=greeting_ready_handler,
                 transition_callback=greeting_callback
             )
-        ],
-        "ui_override": {
-            "type": "button",
-            "prompt": "Is participant ready?",
-            "action_text": "I am ready"
-        }
+        ]
     }
