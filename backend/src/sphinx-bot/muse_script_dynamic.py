@@ -4,9 +4,10 @@ from pipecat_flows import FlowManager, FlowConfig, FlowsFunctionSchema, FlowArgs
 from status_utils import status_updater
 from loguru import logger
 from typing import Dict, Any, Optional
+import os
 
-# Define the base URL for the Muse API
-MUSE_API_BASE_URL = "http://localhost:8000"
+# Define the base URL for the Muse API from .env
+MUSE_API_BASE_URL = os.getenv("MUSE_API_BASE_URL", "http://localhost:8000")
 
 class MuseApiClient:
     """Client for interacting with the Muse EEG API"""
