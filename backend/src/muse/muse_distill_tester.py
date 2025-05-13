@@ -20,7 +20,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # API base URL
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = "http://192.168.3.64:8000"
 
 def check_connection():
     """Check if Muse headband is connected via the API"""
