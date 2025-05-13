@@ -219,6 +219,7 @@ def distill_eeg_data(band_powers_history, mindfulness_scores=None, session_durat
     return "\n".join(summaries)
 
 def main():
+    print("BrainFlow version: " + BoardShim.get_version())
     # Set up Brainflow parameters for Muse S
     params = BrainFlowInputParams()
     # Optionally, specify the MAC address if required: params.mac_address = "xx:xx:xx:xx:xx:xx"

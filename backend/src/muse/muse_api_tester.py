@@ -32,7 +32,7 @@ sys.modules['brainflow.data_filter'].DataFilter = mock_data_filter
 sys.modules['brainflow.data_filter'].FilterTypes = mock_filter_types
 
 # Define API base URL
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = "http://192.168.3.64:8000"
 
 class MockMuseServer:
     """Class to start/stop the Muse API server with mocks in place"""
