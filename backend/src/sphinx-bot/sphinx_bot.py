@@ -386,7 +386,7 @@ async def run_bot(room_url, token, identifier, data=None):
                 "emotion": prosody_data
             }
             status_frame = RTVIServerMessageFrame(message)
-            await rtvi.push_frame(status_frame)               
+            await rtvi.queue_frame(status_frame)               
             
             # Store prosody emotions
             preds = prosody_data.get("prosody", {}).get("predictions", [])
@@ -408,7 +408,7 @@ async def run_bot(room_url, token, identifier, data=None):
                 "language_emotion": language_data
             }
             status_frame = RTVIServerMessageFrame(message)
-            await rtvi.push_frame(status_frame)
+            await rtvi.queue_frame(status_frame)
             
             # Store language emotions
             accumulated_emotions = language_data.get("language", {}).get("accumulated_emotions", [])
