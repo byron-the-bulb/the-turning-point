@@ -24,6 +24,12 @@ interface ChatLogProps {
   emotionData: EmotionData | null;
 }
 
+// Helper function to remove markup tags like <break time="500ms"/> from text
+const removeMarkupTags = (text: string): string => {
+  // This regex matches XML-style tags: <tag> or <tag attribute="value"/>
+  return text.replace(/<[^>]+>/g, '');
+};
+
 const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpeaking, uiOverride, emotionData }) => {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const uiOverrideRef = useRef<HTMLDivElement>(null);
@@ -126,7 +132,7 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpe
                 {message.timestamp.toLocaleTimeString()}
               </span>
             </div>
-            <div className={styles.messageContent}>{message.text}</div>
+            <div className={styles.messageContent}>{removeMarkupTags(message.text)}</div>
           </div>
         ))}
         {uiOverride && (

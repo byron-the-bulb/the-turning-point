@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
 // Local Python backend URL
-const LOCAL_BACKEND_URL = 'http://localhost:8765/connect';
+const SPHINX_SERVER_URL = process.env.NEXT_SPHINX_SERVER_URL || 'http://localhost:8765/connect';
 
 type ResponseData = {
   roomUrl?: string;
@@ -23,11 +23,11 @@ export default async function handler(
   }
 
   try {
-    console.log('Proxying request to local backend at:', LOCAL_BACKEND_URL);
+    console.log('Proxying request to local backend at:', SPHINX_SERVER_URL);
     console.log('Request body:', req.body);
     
     // Forward the request to the local Python backend
-    const response = await axios.post(LOCAL_BACKEND_URL, req.body, {
+    const response = await axios.post(SPHINX_SERVER_URL, req.body, {
       headers: {
         'Content-Type': 'application/json',
       },
