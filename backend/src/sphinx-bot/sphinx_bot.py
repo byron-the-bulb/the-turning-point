@@ -39,7 +39,7 @@ from pipecat.services.cartesia.tts import CartesiaTTSService, Language
 from pipecat.services.elevenlabs import ElevenLabsTTSService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyTransport, DailyParams
-from pipecat.services.whisper.stt import WhisperSTTService, Model
+from pipecat.services.whisper.stt import WhisperSTTService, Model, WhisperSTTServiceMLX, MLXModel
 from pipecat.processors.frameworks.rtvi import RTVIProcessor, RTVIConfig, RTVIObserver, RTVIMessage, RTVIAction, RTVIActionArgument,RTVIServerMessageFrame
 from pipecat_flows import FlowManager
 from tanzer_script_dynamic import SYSTEM_ROLE, create_initial_node
@@ -139,11 +139,11 @@ async def run_bot(room_url, token, identifier, data=None):
             audio_out_enabled=True,
             vad_enabled=True,
             vad_analyzer=SileroVADAnalyzer(params=VADParams(
-                threshold=0.3,              # Sensitive to short bursts
-                min_speech_duration_ms=100, # Captures brief utterances
-                min_silence_duration_ms=50, # Quick response to speech end
-                stop_secs=1.8,              # Tolerant of pauses in long speech
-                max_speech_duration_secs=30 # Allow long utterances                
+                threshold=0.5,              # Sensitive to short bursts
+                min_speech_duration_ms=200, # Captures brief utterances
+                min_silence_duration_ms=100, # Quick response to speech end
+                stop_secs=1.1,              # Tolerant of pauses in long speech
+                max_speech_duration_secs=60 # Allow long utterances                
                 )),
             vad_audio_passthrough=True,
             session_timeout=60 * 2,
@@ -207,7 +207,7 @@ async def run_bot(room_url, token, identifier, data=None):
             api_key=os.getenv("OPENAI_API_KEY"),
             device=sphinx_whisper_device,
             model=Model.DISTIL_MEDIUM_EN,
-            no_speech_prob=0.2
+            no_speech_prob=0.3
         )
 
     tts = None

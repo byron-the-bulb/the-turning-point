@@ -56,6 +56,7 @@ class HumeOfflineWebSocketObserver(BaseObserver, BaseObject):
         
         # Processing state
         self.running = False
+        self.bot_speaking = False
 
     async def start_hume(self, frame: StartFrame):
         """Establish WebSocket connections to Hume's API for both prosody and language models."""
@@ -99,8 +100,17 @@ class HumeOfflineWebSocketObserver(BaseObserver, BaseObject):
         if isinstance(frame, StartFrame):
             logger.info("Starting Hume WebSocket connection")
             await self.start_hume(frame)
+        elif isinstance(frame, BotStartedSpeakingFrame):
+            logger.info("Bot started speaking")
+            self.bot_speaking = True
+        elif isinstance(frame, BotStoppedSpeakingFrame):
+            logger.info("Bot stopped speaking")
+            self.bot_speaking = False
         elif isinstance(frame, UserStartedSpeakingFrame):
             logger.info("User started speaking")
+            if self.bot_speaking:
+                logger.info("Bot is speaking, skipping user speaking")
+                return
             self.process_frames = True
             # Reset accumulated emotions when user starts speaking
             self.accumulated_emotions = {}

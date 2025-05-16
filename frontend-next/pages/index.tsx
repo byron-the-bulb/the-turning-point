@@ -371,9 +371,13 @@ export default function Home() {
     };
 
     const handleUserStartedSpeaking = () => {
-      console.log('User started speaking');
-      setIsWaitingForUser(false);
-      setIsUserSpeaking(true);
+      if (isWaitingForUser) {
+        console.log('User started speaking');
+        setIsWaitingForUser(false);
+        setIsUserSpeaking(true);
+      } else {
+        console.log('User started speaking out of turn');
+      }
     };
 
     const handleUserStoppedSpeaking = () => {
