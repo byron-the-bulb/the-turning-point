@@ -22,7 +22,7 @@ export default function Document() {
         {/* Global styles */}
         <style>{`
           body {
-            background-image: url('/TurningPointBackground.png');
+            background-image: url('/eeg-muse.jpg');
             background-size: contain;
             background-position: center;
             background-attachment: fixed;

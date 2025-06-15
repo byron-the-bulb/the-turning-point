@@ -38,6 +38,7 @@ from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.services.cartesia.tts import CartesiaTTSService, Language
 from pipecat.services.elevenlabs import ElevenLabsTTSService
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.grok.llm import GrokLLMService
 from pipecat.transports.services.daily import DailyTransport, DailyParams
 from pipecat.services.whisper.stt import WhisperSTTService, Model
 from pipecat.processors.frameworks.rtvi import RTVIProcessor, RTVIConfig, RTVIObserver, RTVIMessage, RTVIAction, RTVIActionArgument,RTVIServerMessageFrame
@@ -53,9 +54,10 @@ import json
 import base64
 from pipecat.transports.services.helpers.daily_rest import DailyRESTHelper, DailyRoomParams
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
-from hume_offline_observer import HumeOfflineWebSocketObserver
+from hume_observer_rt import HumeObserver
 from pipecat.processors.filters.stt_mute_filter import STTMuteFilter, STTMuteConfig, STTMuteStrategy
-
+from pipecat.audio.turn.smart_turn.local_smart_turn import LocalSmartTurnAnalyzer
+from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
 
 class SessionTimeoutHandler:
     """Handles actions to be performed when a session times out.
@@ -129,6 +131,9 @@ async def run_bot(room_url, token, identifier, data=None):
             logger.info(f"Parsed configuration data: {config_data}")
         except Exception as e:
             logger.error(f"Error parsing data parameter: {e}")
+
+    #smart_turn_model_path = os.path.join(os.getenv("SPHINX_MOUNT_POINT", "~/models"), "smart_turn_model")
+    #logger.info(f"Using smart turn model path: {smart_turn_model_path}")    
     
     transport = DailyTransport(
         room_url=room_url,
@@ -137,20 +142,26 @@ async def run_bot(room_url, token, identifier, data=None):
         params=DailyParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
-            vad_enabled=True,
             vad_analyzer=SileroVADAnalyzer(params=VADParams(
                 threshold=0.3,              # Sensitive to short bursts
                 min_speech_duration_ms=100, # Captures brief utterances
                 min_silence_duration_ms=50, # Quick response to speech end
                 stop_secs=1.8,              # Tolerant of pauses in long speech
                 max_speech_duration_secs=30 # Allow long utterances                
-                )),
-            vad_audio_passthrough=True,
-            session_timeout=60 * 2,
+                )),            
+            #turn_analyzer=LocalSmartTurnAnalyzer(
+            #    smart_turn_model_path=None,
+            #    params=SmartTurnParams(
+            #        stop_secs=2.0,
+            #        pre_speech_ms=0.0,
+            #        max_duration_secs=8.0
+            #    )
+            #)
         ),
     )
     
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4.1")
+    #llm = GrokLLMService(api_key=os.getenv("GROK_API_KEY"), model="grok-3")
     
     # Get device from environment variable, default to cuda
     sphinx_whisper_device = os.getenv("SPHINX_WHISPER_DEVICE", "cuda")
@@ -257,8 +268,8 @@ async def run_bot(room_url, token, identifier, data=None):
     )
 
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
+    hume_observer = HumeObserver(api_key=os.getenv("HUME_API_KEY"))
     await status_updater.initialize(rtvi, identifier, room_url, station_name)
-    hume_observer = HumeOfflineWebSocketObserver(api_key=os.getenv("HUME_API_KEY"), rtvi=rtvi)
     conversation_pipeline = Pipeline(
         [
             transport.input(),  # Websocket input from client
@@ -311,116 +322,75 @@ async def run_bot(room_url, token, identifier, data=None):
 
     rtvi.register_action(uioverride_response_action)
 
+    # --- Local state for bot speaking and frame caching ---
+    bot_is_speaking_local = False
+    cached_status_frames_local = []
+    # --- End local state ---
+
     @hume_observer.event_handler("on_start_processing_emotions")
-    async def on_start_processing_emotions(hume_processor):
-        logger.info("Starting to process emotions")
-        # Reset accumulated emotions
+    async def on_start_processing_emotions_local(hume_processor):
+        logger.info("Starting to process emotions (local handler)")
+        # Reset accumulated emotions in flow_manager
         flow_manager.state["emotions_summary"] = ""
         flow_manager.state["emotions_fully_processed"] = False
-        # Initialize emotion storage for prosody and language
-        flow_manager.state["prosody_emotions"] = None
-        flow_manager.state["language_emotions"] = None
-
-    # Helper function to combine emotions and generate a summary
-    async def process_combined_emotions():
-        try:
-            prosody_emotions = flow_manager.state.get("prosody_emotions")
-            language_emotions = flow_manager.state.get("language_emotions")
-            
-            # If we don't have both sets of emotions yet, we can't proceed
-            if not prosody_emotions or not language_emotions:
-                logger.info("Still waiting for both prosody and language emotions")
-                return
-            
-            logger.info("Both prosody and language emotions received, generating combined summary")
-            
-            # Create dictionaries from both emotion lists for easier matching
-            prosody_dict = {emotion.get("name"): emotion.get("score", 0) for emotion in prosody_emotions}
-            language_dict = {emotion.get("name"): emotion.get("score", 0) for emotion in language_emotions}
-            
-            # Multiply matching emotions together
-            combined_emotions = {}
-            for emotion_name in set(prosody_dict.keys()).union(language_dict.keys()):
-                prosody_score = prosody_dict.get(emotion_name, 0)
-                language_score = language_dict.get(emotion_name, 0)
-                
-                # If both scores exist, multiply them; otherwise use a weighted combination
-                if prosody_score > 0 and language_score > 0:
-                    # Multiply scores and scale to keep in reasonable range
-                    combined_score = (prosody_score * language_score) ** 0.5  # Square root to normalize scale
-                else:
-                    # If only one score exists, use it at 70% strength
-                    combined_score = max(prosody_score, language_score) * 0.7
-                
-                combined_emotions[emotion_name] = combined_score
-            
-            flow_manager.state["combined_emotions"] = combined_emotions
-            # Sort emotions by combined score and take top 3
-            top_emotions = sorted(combined_emotions.items(), key=lambda x: x[1], reverse=True)[:3]
-            
-            # Create a readable summary
-            if len(top_emotions) >= 3:
-                summary = f"{top_emotions[0][0]}, {top_emotions[1][0]} and {top_emotions[2][0]}"
-            elif len(top_emotions) == 2:
-                summary = f"{top_emotions[0][0]} and {top_emotions[1][0]}"
-            elif len(top_emotions) == 1:
-                summary = top_emotions[0][0]
-            else:
-                summary = "No significant emotions detected"
-            
-            logger.info(f"Combined emotion summary: {summary}")
-            flow_manager.state["emotions_summary"] = summary
-            
-            # Mark emotions as fully processed
-            flow_manager.state["emotions_fully_processed"] = True
-            
-        except Exception as e:
-            logger.error(f"Error processing combined emotions: {e}")
+        # Initialize emotion storage for prosody and language in flow_manager
+        flow_manager.state["prosody_emotions"] = []
+        flow_manager.state["language_emotions"] = []
+        # Note: bot_is_speaking_local and cached_status_frames_local are handled by local vars in the run_bot scope
 
     @hume_observer.event_handler("on_emotions_received")
-    async def on_emotions_received(hume_observer, prosody_data):
-        logger.info(f"Prosody emotions received")
+    async def on_emotions_received_local(hume_observer_param, prosody_data):
+        nonlocal bot_is_speaking_local # To modify the outer scope variable
+        # cached_status_frames_local is a list, can be mutated directly
+
+        logger.info(f"Prosody emotions received (local handler)")
         try:
-            # Send emotions to client for displaying
+            # Append the emotions in the flow manager state emotions array with a timestamp
+            if "prosody_emotions" not in flow_manager.state:
+                flow_manager.state["prosody_emotions"] = []
+            flow_manager.state["prosody_emotions"].append({"timestamp": time_now_iso8601(), "emotions": prosody_data["prosody"]})
+            
+            # Create status frame
             message = {
                 "emotion": prosody_data
             }
             status_frame = RTVIServerMessageFrame(message)
-            await rtvi.queue_frame(status_frame)               
-            
-            # Store prosody emotions
-            preds = prosody_data.get("prosody", {}).get("predictions", [])
-            if preds and len(preds) > 0 and "emotions" in preds[0]:
-                flow_manager.state["prosody_emotions"] = preds[0].get("emotions", [])
-                
-                # Try to process combined emotions if we have both sets
-                await process_combined_emotions()
-            
-        except Exception as e:
-            logger.error(f"Error processing prosody emotions: {e}")
-    
-    @hume_observer.event_handler("on_language_emotions_received")
-    async def on_language_emotions_received(hume_observer, language_data):
-        logger.info(f"Language emotions received")
-        try:
-            # Send language emotions to client for displaying
-            message = {
-                "language_emotion": language_data
-            }
-            status_frame = RTVIServerMessageFrame(message)
-            await rtvi.queue_frame(status_frame)
-            
-            # Store language emotions
-            accumulated_emotions = language_data.get("language", {}).get("accumulated_emotions", [])
-            if accumulated_emotions:
-                flow_manager.state["language_emotions"] = accumulated_emotions
-                
-                # Try to process combined emotions if we have both sets
-                await process_combined_emotions()
-                
-        except Exception as e:
-            logger.error(f"Error processing language emotion data: {e}")
 
+            # If bot is speaking, cache the frame. Otherwise, send it.
+            if bot_is_speaking_local:
+                cached_status_frames_local.append(status_frame)
+                logger.debug(f"Bot is speaking (local), caching status frame. Cache size: {len(cached_status_frames_local)}")
+            else:
+                await rtvi.push_frame(status_frame)
+                logger.debug("Bot not speaking (local), sent status frame immediately.")
+        except Exception as e:
+            logger.error(f"Error processing prosody emotions (local handler): {e}")
+
+    @hume_observer.event_handler("on_bot_started_speaking")
+    async def on_bot_started_speaking_local(hume_observer_param):
+        nonlocal bot_is_speaking_local
+        logger.info("Bot started speaking (local handler)")
+        bot_is_speaking_local = True
+
+    @hume_observer.event_handler("on_bot_stopped_speaking")
+    async def on_bot_stopped_speaking_local(hume_observer_param):
+        nonlocal bot_is_speaking_local
+        # cached_status_frames_local is a list, can be mutated directly
+
+        logger.info("Bot stopped speaking (local handler)")
+        bot_is_speaking_local = False
+        
+        if cached_status_frames_local:
+            logger.info(f"Sending {len(cached_status_frames_local)} cached status frames (local cache).")
+            for frame_to_send in cached_status_frames_local:
+                try:
+                    await rtvi.push_frame(frame_to_send)
+                except Exception as e:
+                    logger.error(f"Error sending cached status frame (local cache): {e}")
+            cached_status_frames_local.clear()
+        else:
+            logger.info("No cached status frames to send (local cache).")
+    
     @transport.event_handler("on_participant_joined")
     async def on_participant_joined(transport, participant):
         #await audiobuffer.start_recording()

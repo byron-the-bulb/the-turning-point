@@ -6,18 +6,17 @@ import wave
 import io
 from collections import deque
 from pipecat.processors.frameworks.rtvi import RTVIProcessor, RTVIServerMessageFrame
-from pipecat.frames.frames import Frame, InputAudioRawFrame, StartFrame, CancelFrame, EndFrame, UserStartedSpeakingFrame, UserStoppedSpeakingFrame, TranscriptionFrame
+from pipecat.frames.frames import Frame, InputAudioRawFrame, StartFrame, CancelFrame, EndFrame, UserStartedSpeakingFrame, UserStoppedSpeakingFrame, TranscriptionFrame, BotStartedSpeakingFrame, BotStoppedSpeakingFrame
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.observers.base_observer import BaseObserver, FramePushed
 from pipecat.utils.base_object import BaseObject
 from loguru import logger
 
-class HumeOfflineWebSocketObserver(BaseObserver, BaseObject):
-    def __init__(self, api_key: str, rtvi: RTVIProcessor, buffer_threshold_ms: int = 500, sample_rate: int = 16000):
+class HumeObserver(BaseObserver, BaseObject):
+    def __init__(self, api_key: str, buffer_threshold_ms: int = 500, sample_rate: int = 16000):
         super().__init__()
         self.api_key = api_key
-        self.rtvi = rtvi
-        
+
         # WebSocket connections for both models
         self.prosody_websocket = None
         self.language_websocket = None
@@ -25,6 +24,7 @@ class HumeOfflineWebSocketObserver(BaseObserver, BaseObject):
         self.process_task = None
         self.process_frames = False
         self._frames_seen = set()
+        self.bot_is_speaking = False
         
         # Initialize the accumulated emotional data state
         self.accumulated_emotions = {}
@@ -40,7 +40,8 @@ class HumeOfflineWebSocketObserver(BaseObserver, BaseObject):
         
         self._register_event_handler("on_start_processing_emotions")
         self._register_event_handler("on_emotions_received")
-        self._register_event_handler("on_language_emotions_received")
+        self._register_event_handler("on_bot_started_speaking")
+        self._register_event_handler("on_bot_stopped_speaking")
 
         # Audio buffer configuration
         self.buffer_threshold_ms = buffer_threshold_ms
@@ -93,6 +94,14 @@ class HumeOfflineWebSocketObserver(BaseObserver, BaseObject):
         if isinstance(frame, StartFrame):
             logger.info("Starting Hume WebSocket connection")
             await self.start_hume(frame)
+        elif isinstance(frame, BotStartedSpeakingFrame):
+            logger.info("Bot started speaking")
+            self.bot_is_speaking = True
+            await self._call_event_handler("on_bot_started_speaking")
+        elif isinstance(frame, BotStoppedSpeakingFrame):
+            logger.info("Bot stopped speaking")
+            self.bot_is_speaking = False
+            await self._call_event_handler("on_bot_stopped_speaking")
         elif isinstance(frame, UserStartedSpeakingFrame):
             logger.info("User started speaking")
             self.process_frames = True
@@ -112,7 +121,7 @@ class HumeOfflineWebSocketObserver(BaseObserver, BaseObject):
                 logger.info(f"Transcription: {frame.text}")
                 # Add transcription to the queue for processing by the websocket thread
                 await self.text_queue.put(frame.text)
-        if self.process_frames and isinstance(frame, InputAudioRawFrame) and data.direction == FrameDirection.DOWNSTREAM:
+        if (not self.bot_is_speaking) and self.process_frames and isinstance(frame, InputAudioRawFrame) and data.direction == FrameDirection.DOWNSTREAM:
             #logger.info(f"Processing frame: {frame} direction: {data.direction}")
             # Instead of sending immediately, add to buffer
             async with self.buffer_lock:
@@ -152,41 +161,22 @@ class HumeOfflineWebSocketObserver(BaseObserver, BaseObject):
                 # If we have enough data, process it or if user stopped speaking then process all remaining data
                 if buffer_size >= self.buffer_threshold_bytes or not self.process_frames:
                     # Collect audio data from buffer up to threshold
-                    audio_data = bytearray()
+                    audio_data = bytearray()    
                     collected_size = 0
                     
                     async with self.buffer_lock:
-                        while self.audio_buffer and (collected_size < self.buffer_threshold_bytes or not self.process_frames):
+                        while self.audio_buffer and (collected_size < self.buffer_threshold_bytes):
                             chunk = self.audio_buffer.popleft()
                             audio_data.extend(chunk)
                             collected_size += len(chunk)
-                        
                         # Reset event if buffer is empty
                         if not self.audio_buffer:
-                            logger.info("Audio buffer empty")
+                            logger.info("Audio buffer emptied")
                             self.buffer_event.clear()
-                            if not self.process_frames:
-                                # make sure we have emotions to send
-                                if self.accumulated_emotions:
-                                    logger.info("User stopped speaking : marking emotions fully processed")
-                                    # Convert accumulated emotions back to the expected format for the event
-                                    accumulated_prosody_data = {
-                                        'prosody': {
-                                            'predictions': [{
-                                                'emotions': [
-                                                {'name': name, 'score': score} 
-                                                for name, score in self.accumulated_emotions.items()
-                                            ]
-                                            }]
-                                        }
-                                    }
-                                    
-                                    # Trigger event with accumulated emotion data
-                                    await self._call_event_handler("on_emotions_received", accumulated_prosody_data)    
-                                
-                    
+
                     # Send collected audio to Hume
-                    if audio_data and self.rtvi:
+                    logger.info(f"Sending audio to Hume : {collected_size} bytes, audio_buffer size: {len(self.audio_buffer)}")
+                    if audio_data:
 
                         # Create WAV file in memory
                         wav_io = io.BytesIO()
@@ -222,24 +212,11 @@ class HumeOfflineWebSocketObserver(BaseObserver, BaseObject):
                             logger.warning(f"Hume warning: {prosody_data.get('warning')}")
                             
                         # Process and accumulate emotional data if it exists
-                        if prosody_data and 'predictions' in prosody_data:
-                            # Increment our update counter
-                            self.emotion_update_count += 1
-                            
-                            for prediction in prosody_data.get('predictions', []):
-                                for emotion in prediction.get('emotions', []):
-                                    emotion_name = emotion.get('name')
-                                    emotion_score = emotion.get('score', 0.0)
-                                    
-                                    # Calculate exponential weighted average to keep scores between 0 and 1
-                                    if emotion_name in self.accumulated_emotions:
-                                        # Use exponential weighted average: new_avg = alpha * current + (1-alpha) * prev_avg
-                                        prev_score = self.accumulated_emotions[emotion_name]
-                                        updated_score = self.alpha * emotion_score + (1 - self.alpha) * prev_score
-                                        self.accumulated_emotions[emotion_name] = updated_score
-                                    else:
-                                        # First time seeing this emotion
-                                        self.accumulated_emotions[emotion_name] = emotion_score
+                        if prosody_data and 'predictions' in prosody_data:                           
+                            # Trigger event with accumulated emotion data
+                            await self._call_event_handler("on_emotions_received", {"prosody": prosody_data})    
+                             
+
                                         
                 else:
                     # Not enough data yet, wait a bit

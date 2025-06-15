@@ -144,7 +144,7 @@ async def start_agent(request: Request):
     identifier = str(uuid.uuid4())
     try:
         proc = subprocess.Popen(
-            [f"python -m sphinx_bot -u {room_url} -t {token} -i {identifier}"],
+            [f"python -m ava_bot -u {room_url} -t {token} -i {identifier}"],
             shell=True,
             bufsize=1,
             cwd=os.path.dirname(os.path.abspath(__file__)),
@@ -185,7 +185,7 @@ async def rtvi_connect(request: Request) -> Dict[Any, Any]:
     identifier = str(uuid.uuid4())
     
     # Prepare command with data from request body if available
-    cmd = f"python -m sphinx_bot -u {room_url} -t {token} -i {identifier}"
+    cmd = f"python -m ava_bot -u {room_url} -t {token} -i {identifier}"
     
     # Add request data as a JSON-encoded command line argument if available
     if request_data:

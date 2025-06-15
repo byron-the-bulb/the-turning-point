@@ -118,7 +118,7 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpe
             <div className={styles.messageHeader}>
               <span className={styles.messageType}>
                 {message.type === 'user' ? 'Participant' : 
-                 message.type === 'guide' ? 'Turning Point' : 
+                 message.type === 'guide' ? 'Muse' : 
                  message.type === 'system' ? 'System' :
                  message.type === 'emotion' ? 'Emotion Detection' : 'Status'}
               </span>
@@ -126,7 +126,9 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpe
                 {message.timestamp.toLocaleTimeString()}
               </span>
             </div>
-            <div className={styles.messageContent}>{message.text}</div>
+            <div className={styles.messageContent}>
+              {stripMarkup(message.text)}
+            </div>
           </div>
         ))}
         {uiOverride && (
@@ -160,6 +162,13 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpe
       </div>
     </div>
   );
+};
+
+// Helper function to remove XML/HTML-like tags from text
+const stripMarkup = (text: string): string => {
+  if (!text) return '';
+  // This regex matches any content between < and > and replaces it with an empty string
+  return text.replace(/<[^>]*>/g, '');
 };
 
 export default ChatLog;
