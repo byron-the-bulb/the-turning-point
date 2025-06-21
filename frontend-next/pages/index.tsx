@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import styles from '@/styles/Home.module.css';
-import { RTVIClientProvider, RTVIClientAudio, useRTVIClient } from '@pipecat-ai/client-react';
+import { RTVIClientProvider, RTVIClientAudio, useRTVIClient, RTVIClientVideo } from '@pipecat-ai/client-react';
 import { RTVIClient, RTVIEvent } from '@pipecat-ai/client-js';
 import { DailyTransport } from '@pipecat-ai/daily-transport';
 
@@ -57,7 +57,8 @@ const createClient = (config: ClientConfig = defaultTtsConfig) => {
         endpoints: { connect: process.env.NEXT_PUBLIC_API_ENDPOINT || '/connect' },
       },
       transport: new DailyTransport(),
-      enableMic: true
+      enableCam: true,
+      enableMic: true,
     });
     
     // Log the selected audio device for debugging purposes
@@ -568,6 +569,16 @@ export default function Home() {
               />
             </div>
             <RTVIClientAudio />
+            <div className={styles.videoContainer}>
+              <RTVIClientVideo
+                participant="local"
+                fit="cover"
+                mirror
+                onResize={({ aspectRatio, height, width }) => {
+                  console.log("Video dimensions changed:", { aspectRatio, height, width });
+                }}
+              />
+            </div>
             <ChatLog
               messages={chatMessages}
               isWaitingForUser={isWaitingForUser}
