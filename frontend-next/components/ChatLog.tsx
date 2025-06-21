@@ -1,9 +1,7 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { useRTVIClient } from '@pipecat-ai/client-react';
-import { v4 as uuidv4 } from 'uuid';
-import styles from '@/styles/ChatLog.module.css';
-import { RTVIMessage } from '@pipecat-ai/client-js';
 import { EmotionData } from '@/components/EmotionTracker';
+import styles from '@/styles/ChatLog.module.css';
+import { useRTVIClient } from '@pipecat-ai/client-react';
+import React, { useEffect, useRef, useState } from 'react';
 
 // Message types
 export type MessageType = 'system' | 'user' | 'guide' | 'status' | 'emotion';
@@ -94,7 +92,7 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, isWaitingForUser, isUserSpe
   return (
     <div className={styles.chatLog}>
       <div className={styles.chatHeader}>
-        <h2>Conversation Log</h2>
+        <h2>Jibber-Jabber</h2>
         {isWaitingForUser && (
           <div className={styles.waitingIndicator}>
             Waiting for your response...

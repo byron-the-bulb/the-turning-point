@@ -2,35 +2,32 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 15px;
-  border-radius: 25px;
-  border: 1px solid transparent;
-  background-color: rgba(255, 255, 255, 0.8);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #444;
+  background-color: #222;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 14px;
-  font-weight: 600;
-  min-width: 90px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  min-width: 80px;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  color: #eee;
 }
 
 .muteButton:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background-color: #333;
+  border-color: #555;
 }
 
 .muteButton:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  background-color: #111;
 }
 
 .muteButton:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-  background-color: rgba(255, 255, 255, 0.5);
+  background-color: #222;
 }
 
 .muted {
@@ -58,7 +55,7 @@
 }
 
 .muteText {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* Responsive design */
@@ -67,8 +64,8 @@
     padding: 8px;
     font-size: 12px;
     min-width: auto;
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
   }
   
