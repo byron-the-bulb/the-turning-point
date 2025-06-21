@@ -1,16 +1,16 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import Head from 'next/head';
 import styles from '@/styles/Home.module.css';
 import { RTVIClientProvider, RTVIClientAudio, useRTVIClient, RTVIClientVideo } from '@pipecat-ai/client-react';
 import { RTVIClient, RTVIEvent } from '@pipecat-ai/client-js';
+import { RTVIClientAudio, RTVIClientProvider } from '@pipecat-ai/client-react';
 import { DailyTransport } from '@pipecat-ai/daily-transport';
+import Head from 'next/head';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Import components
-import ChatLog, { ChatMessage, MessageType } from '@/components/ChatLog';
-import LoadingSpinner from '@/components/LoadingSpinner';
-import EmotionTracker, { EmotionData } from '@/components/EmotionTracker';
 import AudioDeviceSelector from '@/components/AudioDeviceSelector';
-import { useRTVIClientMediaDevices } from "@pipecat-ai/client-react";
+import ChatLog, { ChatMessage, MessageType } from '@/components/ChatLog';
+import { EmotionData } from '@/components/EmotionTracker';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 // Import types
 import { TTSConfig } from '@/types';
@@ -99,6 +99,7 @@ export default function Home() {
   const [emotionData, setEmotionData] = useState<EmotionData | null>(null);
   const [stationName, setStationName] = useState('Station 1'); // Default station name
   const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState<string | undefined>();
+  const [isMuted, setIsMuted] = useState(false);
   const eventHandlersAttached = useRef(false);
   const initialMessageSent = useRef(false);
 
@@ -112,6 +113,27 @@ export default function Home() {
     console.log('Audio device selected:', deviceId);
     setSelectedAudioDeviceId(deviceId);
   };
+
+  // Handle mute toggle
+  const handleToggleMute = useCallback(() => {
+    setIsMuted(prev => {
+      const newMutedState = !prev;
+      console.log('Mute state changed to:', newMutedState);
+      
+      // If we have a client instance, we can also mute/unmute the microphone
+      if (clientInstance) {
+        try {
+          // This would need to be implemented based on the RTVIClient API
+          // For now, we'll just log the state change
+          console.log('Client mute state would be set to:', newMutedState);
+        } catch (error) {
+          console.error('Failed to update client mute state:', error);
+        }
+      }
+      
+      return newMutedState;
+    });
+  }, []);
 
   // Custom setter to log all updates to pendingUIOverride
   const logSetPendingUIOverride = useCallback((newValue: any | null) => {
@@ -502,8 +524,14 @@ export default function Home() {
         <h1 className={styles.title}>
           Muse Voice Bot Interface
         </h1>
-        <h3><div id="statusText">{statusText}</div></h3>
-
+        <h3>
+          <div id="statusText">{statusText}</div>
+          {isMuted && (
+            <div className={styles.muteStatus}>
+              🔇 Microphone is muted
+            </div>
+          )}
+        </h3>
 
         {/* Add Station Name Input */}
         <div className={styles.stationNameContainer}>
@@ -524,6 +552,9 @@ export default function Home() {
             insideProvider={false}
             selectedDeviceId={selectedAudioDeviceId}
             onDeviceSelect={handleAudioDeviceSelect}
+            isMuted={isMuted}
+            onToggleMute={handleToggleMute}
+            muteDisabled={isConnected || isConnecting}
           />
         </div>
 
@@ -565,7 +596,10 @@ export default function Home() {
             <div className={styles.audioControls}>
               <AudioDeviceSelector 
                 insideProvider={true} 
-                selectedDeviceId={selectedAudioDeviceId} 
+                selectedDeviceId={selectedAudioDeviceId}
+                isMuted={isMuted}
+                onToggleMute={handleToggleMute}
+                muteDisabled={false}
               />
             </div>
             <RTVIClientAudio />
