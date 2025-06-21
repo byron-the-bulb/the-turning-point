@@ -2,6 +2,7 @@ import styles from '@/styles/Home.module.css';
 import { RTVIClient, RTVIEvent } from '@pipecat-ai/client-js';
 import { RTVIClientAudio, RTVIClientProvider } from '@pipecat-ai/client-react';
 import { DailyTransport } from '@pipecat-ai/daily-transport';
+import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -14,6 +15,11 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 
 // Import types
 import { TTSConfig } from '@/types';
+
+const ChessBoard = dynamic(() => import('../components/ChessBoard'), {
+  ssr: false,
+  loading: () => <div style={{flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>Loading Chessboard...</div>,
+});
 
 // Generate a truly unique ID for messages
 function generateUniqueId() {
@@ -539,17 +545,6 @@ export default function Home() {
           </div>
         </div>
         <div className={styles.headerRight}>
-          <div className={styles.stationNameContainer}>
-            <label htmlFor="stationName" className={styles.stationNameLabel}>Station:</label>
-            <input 
-              type="text" 
-              id="stationName" 
-              value={stationName} 
-              onChange={handleStationNameChange} 
-              className={styles.stationNameInput}
-              disabled={isConnected || isConnecting}
-            />
-          </div>
           {!isConnected && (
             <div className={styles.audioControls}>
               <AudioDeviceSelector 
@@ -564,9 +559,7 @@ export default function Home() {
       
       <main className={styles.main}>
         <div className={styles.centerPanel}>
-          <div className={styles.canvasPlaceholder}>
-            <p>Canvas Placeholder</p>
-          </div>
+          <ChessBoard />
           <div className={styles.callControlsContainer}>
             <CallControls
               isConnected={isConnected}
