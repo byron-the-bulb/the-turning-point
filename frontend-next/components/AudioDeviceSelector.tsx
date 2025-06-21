@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { useRTVIClientMediaDevices } from "@pipecat-ai/client-react";
 import styles from '@/styles/AudioDeviceSelector.module.css';
+import { useRTVIClientMediaDevices } from "@pipecat-ai/client-react";
+import React, { useEffect, useState } from 'react';
+import MuteButton from './MuteButton';
 
 interface AudioDevice {
   deviceId: string;
@@ -12,12 +13,18 @@ interface AudioDeviceSelectorProps {
   insideProvider?: boolean;
   selectedDeviceId?: string;
   onDeviceSelect?: (deviceId: string) => void;
+  isMuted?: boolean;
+  onToggleMute?: () => void;
+  muteDisabled?: boolean;
 }
 
 const AudioDeviceSelector: React.FC<AudioDeviceSelectorProps> = ({ 
   insideProvider = false,
   selectedDeviceId,
-  onDeviceSelect
+  onDeviceSelect,
+  isMuted = false,
+  onToggleMute,
+  muteDisabled = false
 }) => {
   // State for devices when outside provider
   const [availableDevices, setAvailableDevices] = useState<AudioDevice[]>([]);
@@ -103,27 +110,38 @@ const AudioDeviceSelector: React.FC<AudioDeviceSelectorProps> = ({
 
     return (
       <div className={styles.audioDeviceSelector}>
-        <label htmlFor="mic-select">Active Microphone: </label>
-        {rtviDevices.availableMics.length === 0 ? (
-          <span className={styles.loading}>Loading microphones...</span>
-        ) : (
-          <select
-            id="mic-select"
-            value={rtviDevices.selectedMic?.deviceId || ''}
-            onChange={handleInternalMicChange}
-            className={styles.micSelect}
-          >
+        <div className={styles.audioControlsRow}>
+          <div className={styles.micSelector}>
+            <label htmlFor="mic-select">Active Microphone: </label>
             {rtviDevices.availableMics.length === 0 ? (
-              <option value="">No microphones available</option>
+              <span className={styles.loading}>Loading microphones...</span>
             ) : (
-              rtviDevices.availableMics.map((mic) => (
-                <option key={mic.deviceId} value={mic.deviceId}>
-                  {mic.label || `Microphone ${mic.deviceId.slice(0, 5)}...`}
-                </option>
-              ))
+              <select
+                id="mic-select"
+                value={rtviDevices.selectedMic?.deviceId || ''}
+                onChange={handleInternalMicChange}
+                className={styles.micSelect}
+              >
+                {rtviDevices.availableMics.length === 0 ? (
+                  <option value="">No microphones available</option>
+                ) : (
+                  rtviDevices.availableMics.map((mic) => (
+                    <option key={mic.deviceId} value={mic.deviceId}>
+                      {mic.label || `Microphone ${mic.deviceId.slice(0, 5)}...`}
+                    </option>
+                  ))
+                )}
+              </select>
             )}
-          </select>
-        )}
+          </div>
+          {onToggleMute && (
+            <MuteButton
+              isMuted={isMuted}
+              onToggleMute={onToggleMute}
+              disabled={muteDisabled}
+            />
+          )}
+        </div>
       </div>
     );
   }
@@ -131,29 +149,40 @@ const AudioDeviceSelector: React.FC<AudioDeviceSelectorProps> = ({
   // Otherwise, use the browser's MediaDevices API
   return (
     <div className={styles.audioDeviceSelector}>
-      <label htmlFor="mic-select">Select Microphone: </label>
-      {loading ? (
-        <span className={styles.loading}>Loading microphones...</span>
-      ) : error ? (
-        <div className={styles.error}>{error}</div>
-      ) : (
-        <select
-          id="mic-select"
-          value={selectedDeviceId || ''}
-          onChange={handleExternalMicChange}
-          className={styles.micSelect}
-        >
-          {availableDevices.length === 0 ? (
-            <option value="">No microphones available</option>
+      <div className={styles.audioControlsRow}>
+        <div className={styles.micSelector}>
+          <label htmlFor="mic-select">Select Microphone: </label>
+          {loading ? (
+            <span className={styles.loading}>Loading microphones...</span>
+          ) : error ? (
+            <div className={styles.error}>{error}</div>
           ) : (
-            availableDevices.map((mic) => (
-              <option key={mic.deviceId} value={mic.deviceId}>
-                {mic.label}
-              </option>
-            ))
+            <select
+              id="mic-select"
+              value={selectedDeviceId || ''}
+              onChange={handleExternalMicChange}
+              className={styles.micSelect}
+            >
+              {availableDevices.length === 0 ? (
+                <option value="">No microphones available</option>
+              ) : (
+                availableDevices.map((mic) => (
+                  <option key={mic.deviceId} value={mic.deviceId}>
+                    {mic.label}
+                  </option>
+                ))
+              )}
+            </select>
           )}
-        </select>
-      )}
+        </div>
+        {onToggleMute && (
+          <MuteButton
+            isMuted={isMuted}
+            onToggleMute={onToggleMute}
+            disabled={muteDisabled}
+          />
+        )}
+      </div>
     </div>
   );
 };

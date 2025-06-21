@@ -4,11 +4,12 @@
   width: 100%;
   max-width: 800px;
   margin: 20px auto;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  background-color: rgba(241, 237, 233, 0.7);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  background-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
   height: 400px;
 }
 
@@ -17,63 +18,66 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  background-color: #4b2e83;
+  background: linear-gradient(to right, #6dd5ed, #2193b0);
   color: white;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
 }
 
 .chatHeader h2 {
   margin: 0;
   font-size: 18px;
+  font-weight: 600;
+}
+
+.waitingIndicator,
+.speakingIndicator {
+  padding: 6px 10px;
+  border-radius: 12px;
+  font-size: 14px;
+  animation: pulse 1.5s infinite;
+  color: white;
   font-weight: 500;
 }
 
 .waitingIndicator {
-  padding: 4px 8px;
-  background-color: #ffe082;
-  color: #333;
-  border-radius: 4px;
-  font-size: 14px;
-  animation: pulse 1.5s infinite;
+  background-color: rgba(255, 165, 0, 0.8);
 }
 
 .speakingIndicator {
-  padding: 4px 8px;
-  background-color: #a1ff82;
-  color: #333;
-  border-radius: 4px;
-  font-size: 14px;
-  animation: pulse 1.5s infinite;
+  background-color: rgba(46, 213, 115, 0.8);
 }
 
 @keyframes pulse {
   0% {
-    opacity: 0.6;
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
   }
-  50% {
-    opacity: 1;
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
   }
   100% {
-    opacity: 0.6;
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
   }
 }
 
 .chatMessages {
   flex: 1;
-  padding: 12px;
+  padding: 16px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  background-color: rgba(241, 237, 233, 0.5);
+  gap: 12px;
+  background-color: transparent;
 }
 
 .chatMessage {
-  padding: 10px;
-  border-radius: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
   max-width: 80%;
-  color: black;
+  color: #333;
   animation: fadeIn 0.3s ease-in-out;
+  border: none;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
 
 @keyframes fadeIn {
@@ -89,35 +93,31 @@
 
 .messageUser {
   align-self: flex-end;
-  background-color: #e3f2fd;
-  border: 1px solid #bbdefb;
+  background-color: white;
 }
 
 .messageGuide {
   align-self: flex-start;
-  background-color: #e8eaf6;
-  border: 1px solid #c5cae9;
+  background-color: #e3f2fd;
 }
 
 .messageSystem, .messageStatus {
   align-self: center;
-  background-color: #f5f5f5;
-  border: 1px solid #e0e0e0;
+  background-color: rgba(255, 255, 255, 0.7);
   font-style: italic;
   font-size: 14px;
-  color: #757575;
+  color: #555;
   max-width: 90%;
   text-align: center;
 }
 
 .messageEmotion {
   align-self: center;
-  background-color: #fff8e1;
-  border: 1px solid #ffe082;
+  background-color: #fff9c4;
   font-size: 14px;
-  color: #5d4037;
+  color: #333;
   max-width: 90%;
-  padding: 8px 12px;
+  padding: 10px 15px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
@@ -126,11 +126,11 @@
   justify-content: space-between;
   margin-bottom: 5px;
   font-size: 12px;
-  color: #757575;
+  color: #666;
 }
 
 .messageType {
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .messageContent {
@@ -139,20 +139,20 @@
 
 /* For specific message types */
 .messageUser .messageType {
-  color: #1976d2;
+  color: #0d47a1;
 }
 
 .messageGuide .messageType {
-  color: #512da8;
+  color: #3f51b5;
 }
 
 .messageSystem .messageType,
 .messageStatus .messageType {
-  color: #757575;
+  color: #555;
 }
 
 .messageEmotion .messageType {
-  color: #ff6f00;
+  color: #f57f17;
   font-weight: bold;
 }
 
@@ -161,27 +161,28 @@
 }
 
 .uiOverrideContainer {
-  background-color: #f0f0f0; /* Light background to distinguish from chat */
-  border: 1px solid #ccc; /* Subtle border for separation */
-  border-radius: 5px; /* Rounded corners for a softer look */
-  padding: 15px; /* Space inside the container */
-  margin: 10px 0; /* Space above and below the container */
+  background-color: rgba(255, 255, 255, 0.8);
+  border: none;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 10px 0;
   display: flex;
   flex-direction: column;
-  align-items: flex-start; /* Align items to the left */
+  align-items: stretch;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
 }
 
 /* Emotion data display styling */
 .emotionData {
-  background-color: #f8f9fa;
-  border-bottom: 1px solid #ddd;
+  background-color: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   padding: 10px 16px;
 }
 
 .emotionData h3 {
   margin: 0 0 8px 0;
   font-size: 16px;
-  color: #333;
+  color: white;
   font-weight: 500;
 }
 
@@ -192,10 +193,10 @@
 }
 
 .emotionItem {
-  background-color: #e6f7ff;
-  border: 1px solid #91d5ff;
-  border-radius: 4px;
-  padding: 4px 8px;
+  background-color: rgba(255, 255, 255, 0.8);
+  border: none;
+  border-radius: 12px;
+  padding: 5px 10px;
   display: flex;
   align-items: center;
   font-size: 14px;
@@ -203,54 +204,53 @@
 
 .emotionName {
   font-weight: 500;
-  margin-right: 4px;
+  margin-right: 6px;
 }
 
 .emotionScore {
-  color: #1890ff;
+  color: #2193b0;
   font-weight: 700;
 }
 
 .uiOverrideContainer p {
-  margin: 0 0 10px 0; /* Space below the prompt text */
-  font-size: 16px; /* Readable font size */
-  color: #333; /* Dark text for contrast */
+  margin: 0 0 15px 0;
+  font-size: 16px;
+  color: #333;
 }
 
 .uiOverrideContainer button {
-  background-color: #007bff; /* Blue background for buttons */
-  color: white; /* White text for contrast */
+  background: linear-gradient(45deg, #6dd5ed, #2193b0);
+  color: white;
   border: none;
-  border-radius: 3px;
-  padding: 8px 12px;
+  border-radius: 25px;
+  padding: 10px 15px;
   cursor: pointer;
-  margin-top: 10px; /* Space above the button */
+  margin-top: 10px;
+  font-weight: 600;
+  transition: all 0.3s ease;
 }
 
 .uiOverrideContainer button:hover {
-  background-color: #0056b3; /* Darker blue on hover */
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
 
 .uiOverrideContainer select {
-  width: 100%; /* Full width for dropdown */
-  padding: 8px;
-  margin-top: 10px; /* Space above the dropdown */
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
   border: 1px solid #ccc;
-  border-radius: 3px;
+  border-radius: 8px;
+  background-color: white;
 }
 
 /* Media query for smaller screens */
 @media (max-width: 600px) {
   .uiOverrideContainer {
-    padding: 10px; /* Less padding on small screens */
+    padding: 15px;
   }
 
   .uiOverrideContainer p {
-    font-size: 14px; /* Smaller text on small screens */
-  }
-
-  .uiOverrideContainer button,
-  .uiOverrideContainer select {
-    width: 100%; /* Full width for buttons and dropdowns */
+    font-size: 14px;
   }
 }

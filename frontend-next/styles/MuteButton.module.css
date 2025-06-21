@@ -1,0 +1,83 @@
+.muteButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px;
+  border-radius: 25px;
+  border: 1px solid transparent;
+  background-color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 90px;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.muteButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.muteButton:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.muteButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.muted {
+  background-color: #ff4757;
+  border-color: #ff4757;
+  color: white;
+}
+
+.muted:hover:not(:disabled) {
+  background-color: #e04050;
+}
+
+.unmuted {
+  background-color: #2ed573;
+  border-color: #2ed573;
+  color: white;
+}
+
+.unmuted:hover:not(:disabled) {
+  background-color: #28b463;
+}
+
+.muteIcon {
+  flex-shrink: 0;
+}
+
+.muteText {
+  font-weight: 600;
+}
+
+/* Responsive design */
+@media (max-width: 480px) {
+  .muteButton {
+    padding: 8px;
+    font-size: 12px;
+    min-width: auto;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+  }
+  
+  .muteText {
+    display: none;
+  }
+  
+  .muteIcon {
+    width: 20px;
+    height: 20px;
+  }
+} 
