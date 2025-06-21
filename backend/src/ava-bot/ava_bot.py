@@ -141,6 +141,8 @@ async def run_bot(room_url, token, identifier, data=None):
         params=DailyParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
+            video_in_enabled=True,
+            video_out_enabled=False,
             vad_analyzer=SileroVADAnalyzer(params=VADParams(
                 threshold=0.3,              # Sensitive to short bursts
                 min_speech_duration_ms=100, # Captures brief utterances
@@ -215,7 +217,7 @@ async def run_bot(room_url, token, identifier, data=None):
     )
 
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
-    #hume_observer = HumeObserver(api_key=os.getenv("HUME_API_KEY"))
+    hume_observer = HumeObserver(api_key=os.getenv("HUME_API_KEY"))
     await status_updater.initialize(rtvi, identifier, room_url, station_name)
     conversation_pipeline = Pipeline(
         [
@@ -238,7 +240,7 @@ async def run_bot(room_url, token, identifier, data=None):
             audio_out_sample_rate=48000,
             allow_interruptions=True,
         ),
-        observers=[RTVIObserver(rtvi)]
+        observers=[RTVIObserver(rtvi), hume_observer]
     )
 
     flow_manager = CustomFlowManager(
@@ -273,6 +275,10 @@ async def run_bot(room_url, token, identifier, data=None):
     # --- Local state for bot speaking and frame caching ---
     bot_is_speaking_local = False
     cached_status_frames_local = []
+
+    @hume_observer.event_handler("on_face_emotions_received")
+    async def on_face_emotions_received_local(hume_processor, face_data):
+        logger.info(f"Face emotions : {face_data}")
     # --- End local state ---
 
     # @hume_observer.event_handler("on_start_processing_emotions")
@@ -350,7 +356,7 @@ async def run_bot(room_url, token, identifier, data=None):
             # Update status updater with the participant ID
             await status_updater.initialize(rtvi, identifier, room_url, station_name)
             logger.info(f"StatusUpdater initialized with identifier: {identifier}")
-            
+            await transport.capture_participant_video(participant["id"], framerate=8)
             # Start transcription for the user
             await transport.capture_participant_transcription(participant_id)
             

@@ -1,7 +1,6 @@
 import styles from '@/styles/Home.module.css';
 import { RTVIClientProvider, RTVIClientAudio, useRTVIClient, RTVIClientVideo } from '@pipecat-ai/client-react';
 import { RTVIClient, RTVIEvent } from '@pipecat-ai/client-js';
-import { RTVIClientAudio, RTVIClientProvider } from '@pipecat-ai/client-react';
 import { DailyTransport } from '@pipecat-ai/daily-transport';
 import Head from 'next/head';
 import { useCallback, useEffect, useRef, useState } from 'react';

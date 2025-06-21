@@ -4,9 +4,10 @@ import json
 import websockets
 import wave
 import io
+from PIL import Image
 from collections import deque
 from pipecat.processors.frameworks.rtvi import RTVIProcessor, RTVIServerMessageFrame
-from pipecat.frames.frames import Frame, InputAudioRawFrame, StartFrame, CancelFrame, EndFrame, UserStartedSpeakingFrame, UserStoppedSpeakingFrame, TranscriptionFrame, BotStartedSpeakingFrame, BotStoppedSpeakingFrame
+from pipecat.frames.frames import Frame, InputAudioRawFrame, StartFrame, CancelFrame, EndFrame, UserStartedSpeakingFrame, UserStoppedSpeakingFrame, TranscriptionFrame, BotStartedSpeakingFrame, BotStoppedSpeakingFrame, ImageRawFrame
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.observers.base_observer import BaseObserver, FramePushed
 from pipecat.utils.base_object import BaseObject
@@ -20,8 +21,10 @@ class HumeObserver(BaseObserver, BaseObject):
         # WebSocket connections for both models
         self.prosody_websocket = None
         self.language_websocket = None
+        self.face_websocket = None
         
         self.process_task = None
+        self.process_video_task = None
         self.process_frames = False
         self._frames_seen = set()
         self.bot_is_speaking = False
@@ -38,10 +41,17 @@ class HumeObserver(BaseObserver, BaseObject):
         # Queue for pending text transcriptions to process
         self.text_queue = asyncio.Queue()
         
+        # Queue for pending image frames to process
+        self.image_queue = asyncio.Queue()
+        # Flag to track whether we're processing video
+        self.process_video = False
+        
         self._register_event_handler("on_start_processing_emotions")
         self._register_event_handler("on_emotions_received")
         self._register_event_handler("on_bot_started_speaking")
         self._register_event_handler("on_bot_stopped_speaking")
+        self._register_event_handler("on_face_emotions_received")
+        self._register_event_handler("on_language_emotions_received")
 
         # Audio buffer configuration
         self.buffer_threshold_ms = buffer_threshold_ms
@@ -59,7 +69,7 @@ class HumeObserver(BaseObserver, BaseObject):
         self.running = False
 
     async def start_hume(self, frame: StartFrame):
-        """Establish WebSocket connections to Hume's API for both prosody and language models."""
+        """Establish WebSocket connections to Hume's API for prosody, language, and face models."""
         if not self.api_key:
             logger.error("Hume API key not set, cannot connect.")
             return
@@ -90,9 +100,22 @@ class HumeObserver(BaseObserver, BaseObject):
         response = await self.language_websocket.recv()
         logger.info("Connected to Hume language model WebSocket : " + response)
         
+        # Connect to face model WebSocket
+        logger.info("Connecting to Hume face model WebSocket...")
+        self.face_websocket = await websockets.connect(
+            "wss://api.hume.ai/v0/stream/models",
+            extra_headers=headers,
+            open_timeout=20
+        )
+        # Configure WebSocket to use the face model
+        await self.face_websocket.send(json.dumps({"models": {"face": {}}}))
+        response = await self.face_websocket.recv()
+        logger.info("Connected to Hume face model WebSocket : " + response)
+        
         self.running = True
         self.process_task = asyncio.create_task(self._process_task())
-        logger.info("Started Hume WebSocket processor")
+        self.process_video_task = asyncio.create_task(self._process_task_video())
+        logger.info("Started Hume WebSocket processors")
 
     async def on_push_frame(self, data: FramePushed):
         frame = data.frame
@@ -129,17 +152,113 @@ class HumeObserver(BaseObserver, BaseObject):
                 logger.info(f"Transcription: {frame.text}")
                 # Add transcription to the queue for processing by the websocket thread
                 await self.text_queue.put(frame.text)
-        if (not self.bot_is_speaking) and self.process_frames and isinstance(frame, InputAudioRawFrame) and data.direction == FrameDirection.DOWNSTREAM:
+        elif isinstance(frame, ImageRawFrame):
+            #logger.info(f"Image frame received: {frame}")
+            # Add image frame to the queue for processing by the websocket thread
+            # We queue the whole frame to retain any metadata (format, size) that might be present
+            logger.info(f"Image size frame received: {frame.size}")
+            logger.info(f"Image format frame received: {frame.format}")
+            await self.image_queue.put(frame)
+            self.process_video = True
+           
+        #if (not self.bot_is_speaking) and self.process_frames and isinstance(frame, InputAudioRawFrame) and data.direction == FrameDirection.DOWNSTREAM:
             #logger.info(f"Processing frame: {frame} direction: {data.direction}")
             # Instead of sending immediately, add to buffer
-            async with self.buffer_lock:
-                self.audio_buffer.append(frame.audio)
-                self.buffer_event.set()  # Signal that data is available
+        #    async with self.buffer_lock:
+        #        self.audio_buffer.append(frame.audio)
+        #        self.buffer_event.set()  # Signal that data is available
             
         if isinstance(frame, (CancelFrame, EndFrame)):
             logger.info("Stopping Hume WebSocket connection")
             await self.stop_hume()
 
+    async def _process_task_video(self):
+        """Process image frames sent to Hume's face emotion API."""
+        while self.running:
+            try:
+                # Use a timeout to prevent indefinite blocking
+                try:
+                    # Wait up to 0.5 seconds for image frame
+                    image_frame = await asyncio.wait_for(self.image_queue.get(), timeout=0.5)
+                    
+                    # Only process if we're supposed to be processing video frames
+                    if self.process_video:
+                        # Get the raw image data from the frame
+                        image_data = image_frame.image
+                        logger.info(f"Processing image frame, size: {len(image_data)} bytes")
+                        
+                        # We need to convert it to JPEG before sending
+                        try:
+                            # Create a buffer for the JPEG image
+                            buffer = io.BytesIO()
+                            
+                            # Get image format and size from the frame if available
+                            # Extract format and size from ImageRawFrame attributes
+                            format = getattr(image_frame, 'format', 'RGB')
+                            
+                            # Extract width and height from the size tuple
+                            if hasattr(image_frame, 'size') and isinstance(image_frame.size, tuple) and len(image_frame.size) == 2:
+                                width, height = image_frame.size
+                            else:
+                                # Fallback to default dimensions if size attribute is unavailable or invalid
+                                width, height = 640, 480
+                            
+                            # Convert the raw bytes to a PIL Image and save as JPEG
+                            Image.frombytes(format, (width, height), image_data).save(buffer, format="JPEG")
+                            
+                            # Get the JPEG data and encode as base64
+                            buffer.seek(0)
+                            jpeg_data = buffer.getvalue()
+                            image_b64 = base64.b64encode(jpeg_data).decode('utf-8')
+                            logger.info(f"Converted image to JPEG, new size: {len(jpeg_data)} bytes")
+                        except Exception as e:
+                            logger.error(f"Error converting image to JPEG: {e}")
+                            # Skip processing this frame if we can't convert it
+                            self.image_queue.task_done()
+                            continue
+                        
+                        # Create the request message for the face model
+                        message = {
+                            "data": image_b64,
+                            "models": {"face": {}}
+                        }
+                        
+                        # Send the message to Hume API using the face websocket
+                        await self.face_websocket.send(json.dumps(message))
+                        
+                        # Receive and process response
+                        response = await self.face_websocket.recv()
+                        face_data = json.loads(response)
+                        
+                        # Check for error
+                        if face_data.get('error'):
+                            logger.warning(f"Error from Hume face model: {face_data.get('error')}")
+                        else:
+                            # Process face emotion data
+                            face_predictions = face_data.get('face', {}).get('predictions', [])
+                            if face_predictions:
+                                logger.info(f"Face emotions detected: {len(face_predictions)} faces")
+                                # Trigger event with face emotion data
+                                await self._call_event_handler("on_face_emotions_received", {"face": face_data.get('face', {})})
+                            else:
+                                logger.info("No faces detected in the image")
+                    
+                    # Mark the task as done
+                    self.image_queue.task_done()
+                    
+                except asyncio.TimeoutError:
+                    # No image data available within timeout, continue to next iteration
+                    pass
+                    
+            except websockets.ConnectionClosed:
+                logger.error("Hume face WebSocket connection closed.")
+                break
+            except Exception as e:
+                logger.error(f"Error in hume face process task: {e}")
+                # Don't break the loop on error, just continue
+        
+        logger.info("Video process task stopped")
+        
     async def _process_task(self):
         """Monitor buffer size and send data when threshold is reached."""
         while self.running:
@@ -296,19 +415,37 @@ class HumeObserver(BaseObserver, BaseObject):
                 await self.process_task
             except asyncio.CancelledError:
                 pass
+                
+        if self.process_video_task:
+            self.process_video_task.cancel()
+            try:
+                await self.process_video_task
+            except asyncio.CancelledError:
+                pass
         
-        # Close both websocket connections
+        # Close all websocket connections
         if self.prosody_websocket:
             await self.prosody_websocket.close()
             
         if self.language_websocket:
             await self.language_websocket.close()
             
+        if self.face_websocket:
+            await self.face_websocket.close()
+            
         # Clear text queue
         while not self.text_queue.empty():
             try:
                 self.text_queue.get_nowait()
                 self.text_queue.task_done()
+            except asyncio.QueueEmpty:
+                break
+                
+        # Clear image queue
+        while not self.image_queue.empty():
+            try:
+                self.image_queue.get_nowait()
+                self.image_queue.task_done()
             except asyncio.QueueEmpty:
                 break
 
