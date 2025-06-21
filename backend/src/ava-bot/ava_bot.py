@@ -6,6 +6,7 @@
 
 import sys
 import os
+import datetime
 from loguru import logger
 from dotenv import load_dotenv
 
@@ -17,6 +18,26 @@ logger.remove(0)
 
 # Add console logging
 logger.add(sys.stderr, level="DEBUG")
+
+# Create logs directory if it doesn't exist
+logs_dir = os.path.join(os.path.dirname(__file__), "logs")
+os.makedirs(logs_dir, exist_ok=True)
+
+# Generate timestamp for log file name
+timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+log_file = os.path.join(logs_dir, f"ava_bot_{timestamp}.log")
+
+# Add file logging with rotation
+logger.add(
+    log_file,
+    level="DEBUG",
+    rotation="50 MB",  # Rotate when the file reaches 50 MB
+    compression="zip",  # Compress rotated files
+    retention=10,  # Keep 10 rotated logs
+    format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+)
+
+logger.info(f"Log file created at: {log_file}")
 
 # Import our custom CloudWatch logger and set it up
 #from cloudwatch_logger import setup_cloudwatch_logging
@@ -143,6 +164,8 @@ async def run_bot(room_url, token, identifier, data=None):
             audio_out_enabled=True,
             video_in_enabled=True,
             video_out_enabled=False,
+            video_out_width=640,
+            video_out_height=480,
             vad_analyzer=SileroVADAnalyzer(params=VADParams(
                 threshold=0.3,              # Sensitive to short bursts
                 min_speech_duration_ms=100, # Captures brief utterances

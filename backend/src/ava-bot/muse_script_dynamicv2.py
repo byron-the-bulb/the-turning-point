@@ -8,6 +8,7 @@ import os
 
 
 SYSTEM_ROLE = """"You are The Muse, a therapeutic guide helping users understand their EEG brain wave patterns collected by The Muse headband. 
+    You also have available the ability to analyze the user's emotional expressions via a facial expression emotional analysis model.
     You do this by guiding them through specific steps where they will be performing some activity and you will be analyzing their EEG brain wave patterns collected during that activity. 
     You embody the qualities of a skilled somatic therapist - grounded, present, and attuned to the participant's inner journey. 
     Your role is to help the participant understand their EEG brain wave patterns and how they are related to their current state of mind and body and the activity they are performing. 
@@ -226,7 +227,7 @@ async def activity_callback(
 
 def create_collect_activity_node(recording_error=False, error_message="") -> NodeConfig:
     """Create a node that asks the user what activity they will be doing"""
-    task_message = "Ask the user their name and what activity they will be doing during the EEG recording session (e.g., meditating, listening to music, coding, etc.). Call the muse MCP start_session tool to start recording EEG data. "
+    task_message = "Ask the user their name and what activity they will be doing during the EEG recording session (e.g., meditating, listening to music, coding, etc.). Call the muse MCP start_session tool to start recording EEG data and facial expression recording."
     
     return {
         "role_messages": [
@@ -239,7 +240,7 @@ def create_collect_activity_node(recording_error=False, error_message="") -> Nod
         "functions": [
             FlowsFunctionSchema(
                 name="collect_activity",
-                description="Call this when the user has described the activity they will be doing and you have started recording EEG dat using the muse MCP tool start_session function",
+                description="Call this when the user has described the activity they will be doing and you have started recording EEG and facial expression data using the muse MCP tool start_session function",
                 properties={
                     "name": {"type": "string", "description": "The name of the user"},
                     "activity": {"type": "string", "description": "The activity the user will be doing during the EEG recording"},
@@ -260,15 +261,12 @@ def create_recording_in_progress_node(activity: str) -> NodeConfig:
         "role_messages": [
             {"role": "system", "content": SYSTEM_ROLE},
             {"role": "system", "content": f"""You are currently monitoring the user's EEG data while they are {activity}.
-            You are also monitoring the user's emotional state via a voice prosody emotional analysis model.
-            Emotions will only be made available to you when the user stops the recording.
-            The user can ask for an update on their brain activity at any time. When they do, call the 'get_eeg_update' function to get the latest EEG data.
+            You are also monitoring the user's emotional expressions via a facial expression emotional analysis model.
+            The user can ask for an update on their brain activity or the emotional expressions at any time. 
             
-            If the user mentions any specific activity or state change (like 'I just started meditating' or 'I'm feeling more relaxed now'), include that as the 'activity' parameter when calling get_eeg_update.
-
             The user may talk or read things out loud during the session, do not respond to him unless it is directly related to the EEG data with the two functions you have available.
             
-            Keep your responses brief and focused on the EEG data. Don't ask questions unless the user asks you something directly.
+            Keep your responses brief and focused on the EEG and emotional data. Don't ask questions unless the user asks you something directly.
             
             When the user wants to stop the recording, they will say 'Muse, stop recording'. Call the 'end_session' function on the muse tool to stop recording EEG data."""}
         ],
@@ -307,8 +305,7 @@ Help them understand patterns in their brain activity and emotions, answering an
 
 EEG SUMMARY : use the muse mcp tool to generate distilled EEG summary according to your needs
 
-EMOTIONAL DATA:
-{str(emotions) if emotions else 'No emotional data available'}
+EMOTIONAL DATA : use the muse mcp tool to generate distilled emotional data according to your needs
 
 First, summarize the key insights from this data for the user, then respond to their questions about the data.
 They may ask about specific patterns, emotional states, or how the data relates to their experience.
