@@ -124,9 +124,18 @@ export default function Home() {
     setIsMuted(prev => {
       const newMutedState = !prev;
       console.log('Mute state changed to:', newMutedState);
+      
+      if (clientInstance) {
+        try {
+          clientInstance.enableMic(!newMutedState);
+        } catch (error) {
+          console.error('Failed to update client mute state:', error);
+        }
+      }
+      
       return newMutedState;
     });
-  }, []);
+  }, [clientInstance]);
 
   // Custom setter to log all updates to pendingUIOverride
   const logSetPendingUIOverride = useCallback((newValue: any | null) => {
