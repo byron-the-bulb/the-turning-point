@@ -1,18 +1,25 @@
 import styles from '@/styles/Home.module.css';
-import { RTVIClientProvider, RTVIClientAudio, useRTVIClient, RTVIClientVideo } from '@pipecat-ai/client-react';
 import { RTVIClient, RTVIEvent } from '@pipecat-ai/client-js';
+import { RTVIClientAudio, RTVIClientProvider } from '@pipecat-ai/client-react';
 import { DailyTransport } from '@pipecat-ai/daily-transport';
+import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Import components
 import AudioDeviceSelector from '@/components/AudioDeviceSelector';
+import CallControls from '@/components/CallControls';
 import ChatLog, { ChatMessage, MessageType } from '@/components/ChatLog';
 import { EmotionData } from '@/components/EmotionTracker';
 import LoadingSpinner from '@/components/LoadingSpinner';
 
 // Import types
 import { TTSConfig } from '@/types';
+
+const ChessBoard = dynamic(() => import('../components/ChessBoard'), {
+  ssr: false,
+  loading: () => <div style={{flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>Loading Chessboard...</div>,
+});
 
 // Generate a truly unique ID for messages
 function generateUniqueId() {
@@ -99,8 +106,13 @@ export default function Home() {
   const [stationName, setStationName] = useState('Station 1'); // Default station name
   const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState<string | undefined>();
   const [isMuted, setIsMuted] = useState(false);
+  const isMutedRef = useRef(isMuted);
   const eventHandlersAttached = useRef(false);
   const initialMessageSent = useRef(false);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
 
   // Handle station name change
   const handleStationNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,12 +131,9 @@ export default function Home() {
       const newMutedState = !prev;
       console.log('Mute state changed to:', newMutedState);
       
-      // If we have a client instance, we can also mute/unmute the microphone
       if (clientInstance) {
         try {
-          // This would need to be implemented based on the RTVIClient API
-          // For now, we'll just log the state change
-          console.log('Client mute state would be set to:', newMutedState);
+          clientInstance.enableMic(!newMutedState);
         } catch (error) {
           console.error('Failed to update client mute state:', error);
         }
@@ -132,7 +141,7 @@ export default function Home() {
       
       return newMutedState;
     });
-  }, []);
+  }, [clientInstance]);
 
   // Custom setter to log all updates to pendingUIOverride
   const logSetPendingUIOverride = useCallback((newValue: any | null) => {
@@ -246,12 +255,13 @@ export default function Home() {
     const handleDisconnected = () => {
       console.log('Disconnected from server');
       setStatusText('Disconnected from server');
-      setUIOverride(null);
+      setParticipantId(undefined);
       setIsConnected(false);
       setIsConnecting(false);
-      setIsWaitingForParticipant(false);
-      addChatMessage('Disconnected from the server', 'system');
-      setIsWaitingForUser(false);
+      setIsMuted(false);
+      setConversationStatus(null);
+      logSetPendingUIOverride(null);
+      clientInstance = null;
     };
 
     const handleServerMessage = (event: any) => {
@@ -392,6 +402,7 @@ export default function Home() {
 
     const handleUserStartedSpeaking = () => {
       console.log('User started speaking');
+      if (isMutedRef.current) return;
       setIsWaitingForUser(false);
       setIsUserSpeaking(true);
     };
@@ -511,136 +522,107 @@ export default function Home() {
     }
   }, [addChatMessage]);
 
+  const handleSpeakingState = useCallback((speaking: boolean) => {
+    if (!isMuted) {
+      setIsUserSpeaking(speaking);
+    }
+  }, [isMuted]);
+
   return (
     <div className={styles.container}>
       <Head>
-        <title>Muse Voice Bot</title>
-        <meta name="description" content="Muse Voice Bot Interface" />
+        <title>Big Fish, Little Pawn</title>
+        <meta name="description" content="Big Fish, Little Pawn Interface" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <main className={styles.main}>
-        <h1 className={styles.title}>
-          Muse Voice Bot Interface
-        </h1>
-        <h3>
-          <div id="statusText">{statusText}</div>
-          {isMuted && (
-            <div className={styles.muteStatus}>
-              🔇 Microphone is muted
-            </div>
-          )}
-        </h3>
-
-        {/* Add Station Name Input */}
-        <div className={styles.stationNameContainer}>
-          <label htmlFor="stationName" className={styles.stationNameLabel}>Station Name:</label>
-          <input 
-            type="text" 
-            id="stationName" 
-            value={stationName} 
-            onChange={handleStationNameChange} 
-            className={styles.stationNameInput}
-            disabled={isConnected || isConnecting} // Disable when connected
-          />
-        </div>
-        
-        {/* Audio Device Selector - available before connection */}
-        <div className={styles.audioControls}>
-          <AudioDeviceSelector 
-            insideProvider={false}
-            selectedDeviceId={selectedAudioDeviceId}
-            onDeviceSelect={handleAudioDeviceSelect}
-            isMuted={isMuted}
-            onToggleMute={handleToggleMute}
-            muteDisabled={isConnected || isConnecting}
-          />
-        </div>
-
-        {participantId ? (
-          <>
-            <div className={styles.sessionInfo}>
-              <strong>Participant in session</strong>
-            </div>
-            <div className={styles.scriptInfo}>
-              <strong>Script stage:</strong> {conversationStatus}
-            </div>
-          </>
-        ) : (
-          <div className={styles.noParticipant}>
-            No participant active
+      <header className={styles.header}>
+        <div className={styles.headerLeft}>
+          <h1 className={styles.title}>Big Fish, Little Pawn</h1>
+          <div className={styles.status}>
+            <div id="statusText">{statusText}</div>
+            {isMuted && <div className={styles.muteStatus}>🔇 Muted</div>}
           </div>
-        )}
-
-        <div className={styles.controls}>
-          <button
-            onClick={handleStartConnection}
-            disabled={isConnected || isConnecting}
-            className={styles.startButton}
-          >
-            {isConnecting ? 'Connecting...' : 'Start Experience'}
-          </button>
-          <button
-            onClick={handleStopConnection}
-            disabled={!isConnected}
-            className={styles.stopButton}
-          >
-            Stop Experience
-          </button>
         </div>
-
-        {clientInstance ? (
-          <RTVIClientProvider client={clientInstance}>
-            {/* Show the internal audio selector when connected */}
+        <div className={styles.headerRight}>
+          {!isConnected && (
             <div className={styles.audioControls}>
               <AudioDeviceSelector 
-                insideProvider={true} 
+                insideProvider={false}
                 selectedDeviceId={selectedAudioDeviceId}
-                isMuted={isMuted}
-                onToggleMute={handleToggleMute}
-                muteDisabled={false}
+                onDeviceSelect={handleAudioDeviceSelect}
               />
             </div>
-            <RTVIClientAudio />
-            <div className={styles.videoContainer}>
-              <RTVIClientVideo
-                participant="local"
-                fit="cover"
-                mirror
-                onResize={({ aspectRatio, height, width }) => {
-                  console.log("Video dimensions changed:", { aspectRatio, height, width });
-                }}
-              />
-            </div>
-            <ChatLog
-              messages={chatMessages}
-              isWaitingForUser={isWaitingForUser}
+          )}
+        </div>
+      </header>
+      
+      <main className={styles.main}>
+        <div className={styles.centerPanel}>
+          <ChessBoard />
+          <div className={styles.callControlsContainer}>
+            <CallControls
+              isConnected={isConnected}
+              isMuted={isMuted}
+              onStartCall={handleStartConnection}
+              onStopCall={handleStopConnection}
+              onToggleMute={handleToggleMute}
               isUserSpeaking={isUserSpeaking}
-              uiOverride={uiOverride}
-              emotionData={emotionData}
             />
-          </RTVIClientProvider>
-        ) : (
-          <ChatLog
-            messages={chatMessages}
-            isWaitingForUser={isWaitingForUser}
-            isUserSpeaking={isUserSpeaking}
-            uiOverride={uiOverride}
-            emotionData={null}
-          />
-        )}
+          </div>
+        </div>
 
-        {/* 
-        Emotion Tracker Component - Keeping component in project but not displaying it
-        {isConnected && (
-          <EmotionTracker emotionData={emotionData} />
-        )}
-        */}
-
-        {(isConnecting || isWaitingForParticipant) && (
-          <LoadingSpinner message="Waiting for Muse Voice Bot to join..." />
-        )}
+        <aside className={styles.rightPanel}>
+          <div className={styles.rightPanelContent}>
+            <div className={styles.videoContainer}>
+              <video muted playsInline autoPlay loop poster="/TurningPointBackground.png" className={styles.videoPlaceholder}>
+                  {/* <source src="/path/to/video.mp4" type="video/mp4" /> */}
+                  Your browser does not support the video tag.
+              </video>
+            </div>
+            {participantId ? (
+              <>
+                <div className={styles.sessionInfo}>
+                  <strong>Participant in session</strong>
+                </div>
+                <div className={styles.scriptInfo}>
+                  <strong>Script stage:</strong> {conversationStatus}
+                </div>
+              </>
+            ) : (
+              !isConnected && <div className={styles.noParticipant}>
+                Not in a session
+              </div>
+            )}
+          </div>
+          <div className={styles.chatLogContainer}>
+            {clientInstance ? (
+              <RTVIClientProvider client={clientInstance}>
+                <RTVIClientAudio />
+                <ChatLog
+                  messages={chatMessages}
+                  isWaitingForUser={isWaitingForUser}
+                  isUserSpeaking={isUserSpeaking}
+                  uiOverride={uiOverride}
+                  emotionData={emotionData}
+                />
+              </RTVIClientProvider>
+            ) : (
+              <ChatLog
+                messages={chatMessages}
+                isWaitingForUser={isWaitingForUser}
+                isUserSpeaking={isUserSpeaking}
+                uiOverride={uiOverride}
+                emotionData={null}
+              />
+            )}
+          </div>
+        </aside>
       </main>
+
+      {(isConnecting || isWaitingForParticipant) && (
+        <LoadingSpinner message="Waiting for Muse Voice Bot to join..." />
+      )}
     </div>
   );
 }

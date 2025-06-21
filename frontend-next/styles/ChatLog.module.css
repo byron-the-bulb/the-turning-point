@@ -2,82 +2,74 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 800px;
-  margin: 20px auto;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-  background-color: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  height: 400px;
+  height: 100%;
+  background-color: transparent;
+  border: none;
 }
 
 .chatHeader {
+  flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  background: linear-gradient(to right, #6dd5ed, #2193b0);
+  padding: 1rem 0;
   color: white;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+  background-color: transparent;
 }
 
 .chatHeader h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 1.2rem;
   font-weight: 600;
 }
 
 .waitingIndicator,
 .speakingIndicator {
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-radius: 12px;
-  font-size: 14px;
+  font-size: 0.9rem;
   animation: pulse 1.5s infinite;
   color: white;
   font-weight: 500;
 }
 
 .waitingIndicator {
-  background-color: rgba(255, 165, 0, 0.8);
+  background-color: #d29d00;
 }
 
 .speakingIndicator {
-  background-color: rgba(46, 213, 115, 0.8);
+  background-color: #2ed573;
 }
 
 @keyframes pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
+    opacity: 0.7;
   }
-  70% {
-    box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
+  50% {
+    opacity: 1;
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    opacity: 0.7;
   }
 }
 
 .chatMessages {
   flex: 1;
-  padding: 16px;
+  padding-right: 1rem; /* For scrollbar spacing */
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  background-color: transparent;
+  gap: 1rem;
 }
 
 .chatMessage {
   padding: 12px 16px;
   border-radius: 12px;
-  max-width: 80%;
-  color: #333;
+  max-width: 85%;
+  color: #eee;
   animation: fadeIn 0.3s ease-in-out;
   border: none;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  line-height: 1.5;
 }
 
 @keyframes fadeIn {
@@ -93,44 +85,49 @@
 
 .messageUser {
   align-self: flex-end;
-  background-color: white;
+  background-color: #004d99; /* Darker blue for user */
+  color: white;
 }
 
 .messageGuide {
   align-self: flex-start;
-  background-color: #e3f2fd;
+  background-color: #2a2a2e;
+  border: 1px solid #444;
 }
 
 .messageSystem, .messageStatus {
   align-self: center;
-  background-color: rgba(255, 255, 255, 0.7);
+  background-color: transparent;
   font-style: italic;
-  font-size: 14px;
-  color: #555;
+  font-size: 0.9rem;
+  color: #888;
   max-width: 90%;
   text-align: center;
 }
 
 .messageEmotion {
   align-self: center;
-  background-color: #fff9c4;
-  font-size: 14px;
-  color: #333;
+  background-color: #3b3a32;
+  border: 1px solid #8e8334;
+  font-size: 0.9rem;
+  color: #eee;
   max-width: 90%;
   padding: 10px 15px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
 }
 
 .messageHeader {
   display: flex;
   justify-content: space-between;
   margin-bottom: 5px;
-  font-size: 12px;
-  color: #666;
+  font-size: 0.8rem;
+  color: #aaa;
 }
 
 .messageType {
   font-weight: 600;
+  text-transform: capitalize;
 }
 
 .messageContent {
@@ -139,20 +136,20 @@
 
 /* For specific message types */
 .messageUser .messageType {
-  color: #0d47a1;
+  color: #99c2ff;
 }
 
 .messageGuide .messageType {
-  color: #3f51b5;
+  color: #b3b3b3;
 }
 
 .messageSystem .messageType,
 .messageStatus .messageType {
-  color: #555;
+  color: #888;
 }
 
 .messageEmotion .messageType {
-  color: #f57f17;
+  color: #ffdf60;
   font-weight: bold;
 }
 
@@ -161,27 +158,27 @@
 }
 
 .uiOverrideContainer {
-  background-color: rgba(255, 255, 255, 0.8);
-  border: none;
+  background-color: #2a2a2e;
+  border: 1px solid #444;
   border-radius: 12px;
   padding: 20px;
   margin: 10px 0;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
 }
 
 /* Emotion data display styling */
 .emotionData {
   background-color: transparent;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 1px solid #444;
   padding: 10px 16px;
+  margin-bottom: 1rem;
 }
 
 .emotionData h3 {
   margin: 0 0 8px 0;
-  font-size: 16px;
+  font-size: 1rem;
   color: white;
   font-weight: 500;
 }
@@ -193,36 +190,37 @@
 }
 
 .emotionItem {
-  background-color: rgba(255, 255, 255, 0.8);
-  border: none;
+  background-color: #222;
+  border: 1px solid #444;
   border-radius: 12px;
   padding: 5px 10px;
   display: flex;
   align-items: center;
-  font-size: 14px;
+  font-size: 0.9rem;
 }
 
 .emotionName {
   font-weight: 500;
   margin-right: 6px;
+  color: #ccc;
 }
 
 .emotionScore {
-  color: #2193b0;
+  color: #6dd5ed;
   font-weight: 700;
 }
 
 .uiOverrideContainer p {
   margin: 0 0 15px 0;
-  font-size: 16px;
-  color: #333;
+  font-size: 1rem;
+  color: #eee;
 }
 
 .uiOverrideContainer button {
   background: linear-gradient(45deg, #6dd5ed, #2193b0);
   color: white;
   border: none;
-  border-radius: 25px;
+  border-radius: 8px;
   padding: 10px 15px;
   cursor: pointer;
   margin-top: 10px;
@@ -239,9 +237,10 @@
   width: 100%;
   padding: 10px;
   margin-top: 10px;
-  border: 1px solid #ccc;
+  border: 1px solid #444;
   border-radius: 8px;
-  background-color: white;
+  background-color: #222;
+  color: #fff;
 }
 
 /* Media query for smaller screens */
