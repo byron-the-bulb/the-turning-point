@@ -1,22 +1,22 @@
-# The Turning Point Voice Bot
+# The AVA Voice Bot
 
 A voice-based conversational AI bot that provides guided conversations with real-time emotion analysis and feedback, and drives a video display using Resolume.
 
 ## Overview
 
-The Turning Point Voice Bot is a sophisticated conversational AI platform built on a modern architecture that combines real-time audio processing, emotion analysis, and guided conversation flows. The bot can be deployed as a Docker container and connects to users through Daily.co video/audio rooms.
+The AVA Voice Bot is a sophisticated conversational AI platform built on a modern architecture that combines real-time audio processing, emotion analysis, and guided conversation flows. The bot can be deployed as a Docker container and connects to users through Daily.co video/audio rooms.
 
 ## Installation and Usage
 
 ### Prerequisites
 
-- Docker with NVIDIA support (for GPU acceleration)
-- NVIDIA CUDA 12.1 compatible GPU (recommended for optimal performance)
 - AWS account (optional, for CloudWatch logging)
 - API keys for:
   - Daily.co
   - OpenAI
   - Hume AI (for emotion analysis)
+  - Cartesia
+  - Fish Audio
 
 ### Building the Docker Image
 
@@ -57,8 +57,8 @@ pip install -r requirements.txt
 2. Run the FastAPI server:
 
 ```bash
-cd src/sphinx-bot
-python -m uvicorn server:app --host 0.0.0.0 --port 8000
+cd src/ava-bot
+python server.py
 ```
 
 use the connect_local api nextjs endpoint when running locally with the FastAPI server
@@ -195,12 +195,12 @@ sphinx-voice-bot/
 │   ├── build.sh
 │   ├── requirements.txt
 │   └── src/
-│       └── sphinx-bot/
+│       └── ava-bot/
 │           ├── __init__.py
 │           ├── cloudwatch_logger.py
 │           ├── custom_flow_manager.py
 │           ├── server.py
-│           ├── sphinx_bot.py
+│           ├── ava_bot.py
 │           ├── sphinx_script.py
 │           └── status_utils.py
 ├── frontend-next/
@@ -213,7 +213,7 @@ sphinx-voice-bot/
 
 To extend the bot's capabilities:
 
-1. **Add new conversation flows**: Modify `sphinx_script.py` to define new conversation paths and responses
+1. **Add new conversation flows**: Modify `muse_script_dynamicv2.py` to define new conversation paths and responses
 2. **Enhance emotion analysis**: Integrate additional Hume AI features or custom emotion processing logic
 3. **Improve audio processing**: Add custom audio processors to the Pipecat pipeline
 

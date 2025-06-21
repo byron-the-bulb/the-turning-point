@@ -41,12 +41,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
+logs
 scratch
 sphinx-env
-<<<<<<< HEAD
 backend/sphinxenv/
 other/
-=======
-res-ctrl-venv
->>>>>>> 866d2810287122ee63ce620929c295ecd31dd874

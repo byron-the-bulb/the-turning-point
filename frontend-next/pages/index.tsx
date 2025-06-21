@@ -7,8 +7,6 @@ import { DailyTransport } from '@pipecat-ai/daily-transport';
 
 // Import components
 import ChatLog, { ChatMessage, MessageType } from '@/components/ChatLog';
-import VoiceSelector from '@/components/VoiceSelector';
-import VoiceSettingsPanel from '@/components/VoiceSettingsPanel';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmotionTracker, { EmotionData } from '@/components/EmotionTracker';
 import AudioDeviceSelector from '@/components/AudioDeviceSelector';
@@ -505,22 +503,6 @@ export default function Home() {
         </h1>
         <h3><div id="statusText">{statusText}</div></h3>
 
-        <div className={styles.voiceSettingsContainer}>
-          <div className={styles.voiceSelectionContainer}>
-            <VoiceSelector
-              onVoiceSelect={handleVoiceSelect}
-              initialVoiceId={selectedVoiceId}
-              apiKey={CARTESIA_API_KEY}
-            />
-          </div>
-
-          <VoiceSettingsPanel
-            selectedSpeed={selectedSpeed}
-            selectedEmotions={selectedEmotions}
-            onSpeedSelect={handleSpeedSelect}
-            onEmotionsChange={handleEmotionsChange}
-          />
-        </div>
 
         {/* Add Station Name Input */}
         <div className={styles.stationNameContainer}>

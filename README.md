@@ -1,12 +1,12 @@
-# Turning Point Voice Bot
+# AVA Voice Bot
 
 A sophisticated conversational AI platform with real-time emotion analysis and guided conversations.
 
 ## Overview
 
-Turning Point Voice Bot combines cutting-edge voice processing, emotion analysis, and conversational AI to create an immersive and responsive voice interaction experience. The system analyzes users' emotional states in real-time while guiding them through transformative conversations.
+The AVA Voice Bot combines cutting-edge voice processing, emotion analysis, and conversational AI to create an immersive and responsive voice interaction experience. The system analyzes users' emotional states in real-time while guiding them through transformative conversations.
 
-![Turning Point Voice Bot Architecture](./turning-point-architecture.png)
+![AVA Voice Bot Architecture](./ava-architecture.png)
 
 ## Key Features
 
@@ -42,28 +42,28 @@ The frontend is built with Next.js and React, providing a modern web interface f
 
 ### Prerequisites
 
-- Docker with NVIDIA support (for backend)
 - Node.js 18+ and npm/yarn (for frontend)
 - API keys for:
   - Daily.co
   - OpenAI
   - Hume AI
   - Cartesia or other TTS providers
-- RunPod account (optional, for cloud deployment)
+  - Fish Audio
 
 ### Quick Start
 
 1. **Set up the backend**:
 ```bash
 cd backend
-# Create .env file with your API keys
-./build.sh
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
 2. **Start the backend server**:
 ```bash
-cd backend/src/sphinx-bot
-python -m uvicorn server:app --host 0.0.0.0 --port 8000
+cd backend/src/ava-bot
+python server.py
 ```
 
 3. **Set up the frontend**:
@@ -82,20 +82,9 @@ npm run dev
 5. **Access the application**:
    Open [http://localhost:3000](http://localhost:3000) in your browser
 
-## Resolume VJ Integration
-
-The Turning Point Bot includes a dedicated module for controlling Resolume Arena/Avenue VJ software through OSC (Open Sound Control) protocol. This integration enables:
-
-- **Emotional Visualization** - Triggering visual scenes based on detected user emotions
-- **Real-time Parameter Control** - Adjusting opacity, speed, and other parameters of visual layers
-- **Conversation-Driven Visuals** - Automatic scene selection based on conversation topics and flow stages
-- **Synchronized Performance** - Precise timing between spoken content and visual elements
-
-The Resolume app component runs alongside the main bot and translates conversation states and emotional data into OSC messages that Resolume can understand and respond to in real-time.
-
 ## Architecture
 
-The Turning Point Voice Bot uses a modern, distributed architecture:
+The AVA Voice Bot uses a modern, distributed architecture:
 
 1. **User Interface Layer** (Frontend)
    - Next.js web application
@@ -118,33 +107,8 @@ The Turning Point Voice Bot uses a modern, distributed architecture:
    - Local development with Docker
    - Cloud deployment with RunPod
 
-## RunPod Execution
 
-RunPod provides GPU-accelerated infrastructure for deploying the Turning Point Voice Bot:
 
-### How It Works
-
-1. **Template-based Deployment**: The system uses pre-configured RunPod templates with the Turning Point bot Docker image
-2. **Dynamic Provisioning**: When a user connects to the frontend, the system:
-   - Creates a Daily.co room for audio communication
-   - Dynamically provisions a GPU-accelerated RunPod instance
-   - Configures the bot with the room credentials and TTS settings
-   - Connects the user to the bot through Daily.co
-
-3. **GPU Selection**: The system automatically tries multiple GPU configurations in order of preference:
-   - NVIDIA RTX 4000 Ada Generation (preferred)
-   - NVIDIA GeForce RTX 4090
-   - NVIDIA GeForce RTX 5080
-   - Several fallback options with varying CPU/memory configurations
-
-4. **Resource Management**: Each bot instance runs in its own isolated RunPod environment with dedicated resources
-
-### Benefits
-
-- **Scalability**: Automatically scales to handle multiple concurrent users
-- **Performance**: GPU acceleration for Whisper STT and other compute-intensive tasks
-- **Flexibility**: No need to maintain local GPU infrastructure
-- **Cost-effectiveness**: Pay-as-you-go model for GPU resources
 
 ## Development
 

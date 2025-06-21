@@ -60,12 +60,18 @@ class HumeObserver(BaseObserver, BaseObject):
 
     async def start_hume(self, frame: StartFrame):
         """Establish WebSocket connections to Hume's API for both prosody and language models."""
+        if not self.api_key:
+            logger.error("Hume API key not set, cannot connect.")
+            return
+
         headers = {"X-Hume-Api-Key": self.api_key}
         
         # Connect to prosody model WebSocket
+        logger.info("Connecting to Hume prosody model WebSocket...")
         self.prosody_websocket = await websockets.connect(
             "wss://api.hume.ai/v0/stream/models",
-            extra_headers=headers
+            extra_headers=headers,
+            open_timeout=20
         )
         # Configure WebSocket to use the prosody model
         await self.prosody_websocket.send(json.dumps({"models": {"prosody": {}}}))
@@ -73,9 +79,11 @@ class HumeObserver(BaseObserver, BaseObject):
         logger.info("Connected to Hume prosody model WebSocket : " + response)
         
         # Connect to language model WebSocket
+        logger.info("Connecting to Hume language model WebSocket...")
         self.language_websocket = await websockets.connect(
             "wss://api.hume.ai/v0/stream/models",
-            extra_headers=headers
+            extra_headers=headers,
+            open_timeout=20
         )
         # Configure WebSocket to use the language model
         await self.language_websocket.send(json.dumps({"models": {"language": {"granularity": "passage"}}}))
