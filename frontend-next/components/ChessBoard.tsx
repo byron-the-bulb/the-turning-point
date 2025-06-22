@@ -1,5 +1,5 @@
 import { Chess } from 'chess.js';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Chessboard } from 'react-chessboard';
 
 import Engine from '../public/stockfish/engine';
@@ -7,6 +7,8 @@ import Engine from '../public/stockfish/engine';
 const ChessBoard: React.FC = () => {
   const engine = useMemo(() => new Engine(), []);
   const [game, setGame] = useState(new Chess());
+  const [boardWidth, setBoardWidth] = useState(0);
+  const boardContainerRef = useRef<HTMLDivElement>(null);
 
   function safeGameMutate(modify: (g: Chess) => void) {
     setGame((g) => {
@@ -33,6 +35,26 @@ const ChessBoard: React.FC = () => {
       }
     });
   }, [engine]);
+
+  useEffect(() => {
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        const { width, height } = entry.contentRect;
+        // Set board size to 90% of the smallest dimension of the container
+        const newSize = Math.min(width, height) * 0.9;
+        setBoardWidth(newSize);
+      }
+    });
+
+    if (boardContainerRef.current) {
+      observer.observe(boardContainerRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   function onDrop(sourceSquare: string, targetSquare: string, piece: string) {
     let moveSuccessful = false;
@@ -157,7 +179,7 @@ const ChessBoard: React.FC = () => {
   }, [engine]);
 
   return (
-    <div style={boardWrapperStyle}>
+    <div ref={boardContainerRef} style={boardWrapperStyle}>
       <div style={{
         display: "flex",
         justifyContent: "center",
@@ -177,57 +199,59 @@ const ChessBoard: React.FC = () => {
           Undo
         </button>
       </div>
-      <div style={{ marginTop: '-10px' }}>
-        <style jsx>{`
+      {boardWidth > 0 && (
+        <div style={{ marginTop: '-10px' }}>
+          <style jsx>{`
             :global([data-boardid="Styled3DBoard"] > div) {
               margin-top: -3px !important;
               margin-left: -10px !important;
             }
           `}</style>
-        <Chessboard
-          id="Styled3DBoard"
-          position={game.fen()}
-          onPieceDrop={onDrop}
-          boardWidth={640}
-          customBoardStyle={{
-            transform: "rotateX(27.5deg)",
-            transformOrigin: "center",
-            border: "16px solid #b8836f",
-            borderStyle: "outset",
-            borderRightColor: " #b27c67",
-            borderRadius: "4px",
-            boxShadow: "rgba(0, 0, 0, 0.5) 2px 24px 24px 8px",
-            borderRightWidth: "16px",
-            borderLeftWidth: "16px",
-            borderTopWidth: "0px",
-            borderBottomWidth: "18px",
-            borderTopLeftRadius: "8px",
-            borderTopRightRadius: "8px",
-            padding: "8px 8px 12px",
-            backgroundColor: "#e0c094",
-            backgroundImage: 'url("/wood-pattern.png")',
-            backgroundSize: "cover",
-          }}
-          customPieces={threeDPieces}
-          customLightSquareStyle={{
-            backgroundColor: "#e0c094",
-            backgroundImage: 'url("/wood-pattern.png")',
-            backgroundSize: "cover"
-          }} customDarkSquareStyle={{
-            backgroundColor: "#865745",
-            backgroundImage: 'url("/wood-pattern.png")',
-            backgroundSize: "cover"
-          }}
-          animationDuration={500}
-          customSquareStyles={{
-            [activeSquare]: {
-              boxShadow: "inset 0 0 1px 6px rgba(255,255,255,0.75)"
-            }
-          }}
-          onMouseOverSquare={(sq) => setActiveSquare(sq)}
-          onMouseOutSquare={() => setActiveSquare("")}
-        />
-      </div>
+          <Chessboard
+            id="Styled3DBoard"
+            position={game.fen()}
+            onPieceDrop={onDrop}
+            boardWidth={boardWidth}
+            customBoardStyle={{
+              transform: "rotateX(27.5deg)",
+              transformOrigin: "center",
+              border: "16px solid #b8836f",
+              borderStyle: "outset",
+              borderRightColor: " #b27c67",
+              borderRadius: "4px",
+              boxShadow: "rgba(0, 0, 0, 0.5) 2px 24px 24px 8px",
+              borderRightWidth: "16px",
+              borderLeftWidth: "16px",
+              borderTopWidth: "0px",
+              borderBottomWidth: "18px",
+              borderTopLeftRadius: "8px",
+              borderTopRightRadius: "8px",
+              padding: "8px 8px 12px",
+              backgroundColor: "#e0c094",
+              backgroundImage: 'url("/wood-pattern.png")',
+              backgroundSize: "cover",
+            }}
+            customPieces={threeDPieces}
+            customLightSquareStyle={{
+              backgroundColor: "#e0c094",
+              backgroundImage: 'url("/wood-pattern.png")',
+              backgroundSize: "cover"
+            }} customDarkSquareStyle={{
+              backgroundColor: "#865745",
+              backgroundImage: 'url("/wood-pattern.png")',
+              backgroundSize: "cover"
+            }}
+            animationDuration={500}
+            customSquareStyles={{
+              [activeSquare]: {
+                boxShadow: "inset 0 0 1px 6px rgba(255,255,255,0.75)"
+              }
+            }}
+            onMouseOverSquare={(sq) => setActiveSquare(sq)}
+            onMouseOutSquare={() => setActiveSquare("")}
+          />
+        </div>
+      )}
     </div>
   );
 };
