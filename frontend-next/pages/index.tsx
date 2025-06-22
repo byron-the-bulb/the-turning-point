@@ -582,6 +582,7 @@ export default function Home() {
                       participant="local"
                       fit="contain"
                       mirror
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                       onResize={({ aspectRatio, height, width }) => {
                         console.log("Video dimensions changed:", { aspectRatio, height, width });
                       }}
