@@ -59,7 +59,7 @@ packaging==24.2
 pillow==11.1.0
 Pint==0.24.4
 pipecat-ai==0.0.71
-pipecat-ai-flows @ file:///Users/rkorrapolu/io/git/hack/pipecat-flows
+pipecat-ai-flows @ pipecat-ai-flows @ file:///Users/massimo/Projects/ai/pipecat-flows
 platformdirs==4.3.7
 propcache==0.3.1
 protobuf==5.29.4
