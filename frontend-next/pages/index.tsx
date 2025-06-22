@@ -573,35 +573,37 @@ export default function Home() {
         </div>
 
         <aside className={styles.rightPanel}>
-          <div className={styles.rightPanelContent}>
-            <div className={styles.videoContainer}>
-              <RTVIClientVideo
-                participant="local"
-                fit="cover"
-                mirror
-                onResize={({ aspectRatio, height, width }) => {
-                  console.log("Video dimensions changed:", { aspectRatio, height, width });
-                }}
-              />
-            </div>
-            {participantId ? (
-              <>
-                <div className={styles.sessionInfo}>
-                  <strong>Participant in session</strong>
+          {clientInstance ? (
+            <RTVIClientProvider client={clientInstance}>
+              <div className={styles.rightPanelContent}>
+                <div className={styles.videoContainer}>
+                  <div className={styles.videoPlaceholder}>
+                    <RTVIClientVideo
+                      participant="local"
+                      fit="contain"
+                      mirror
+                      onResize={({ aspectRatio, height, width }) => {
+                        console.log("Video dimensions changed:", { aspectRatio, height, width });
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className={styles.scriptInfo}>
-                  <strong>Script stage:</strong> {conversationStatus}
-                </div>
-              </>
-            ) : (
-              !isConnected && <div className={styles.noParticipant}>
-                Not in a session
+                {participantId ? (
+                  <>
+                    <div className={styles.sessionInfo}>
+                      <strong>Participant in session</strong>
+                    </div>
+                    <div className={styles.scriptInfo}>
+                      <strong>Script stage:</strong> {conversationStatus}
+                    </div>
+                  </>
+                ) : (
+                  !isConnected && <div className={styles.noParticipant}>
+                    Not in a session
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          <div className={styles.chatLogContainer}>
-            {clientInstance ? (
-              <RTVIClientProvider client={clientInstance}>
+              <div className={styles.chatLogContainer}>
                 <RTVIClientAudio />
                 <ChatLog
                   messages={chatMessages}
@@ -610,17 +612,33 @@ export default function Home() {
                   uiOverride={uiOverride}
                   emotionData={emotionData}
                 />
-              </RTVIClientProvider>
-            ) : (
-              <ChatLog
-                messages={chatMessages}
-                isWaitingForUser={isWaitingForUser}
-                isUserSpeaking={isUserSpeaking}
-                uiOverride={uiOverride}
-                emotionData={null}
-              />
-            )}
-          </div>
+              </div>
+            </RTVIClientProvider>
+          ) : (
+            <>
+              <div className={styles.rightPanelContent}>
+                <div className={styles.videoContainer}>
+                  <video muted playsInline autoPlay loop poster="/TurningPointBackground.png" className={styles.videoPlaceholder}>
+                      {/* <source src="/path/to/video.mp4" type="video/mp4" /> */}
+                      Your browser does not support the video tag.
+                  </video>
+                </div>
+                {!isConnected && <div className={styles.noParticipant}>
+                    Not in a session
+                  </div>
+                }
+              </div>
+              <div className={styles.chatLogContainer}>
+                <ChatLog
+                  messages={chatMessages}
+                  isWaitingForUser={isWaitingForUser}
+                  isUserSpeaking={isUserSpeaking}
+                  uiOverride={uiOverride}
+                  emotionData={null}
+                />
+              </div>
+            </>
+          )}
         </aside>
       </main>
 
