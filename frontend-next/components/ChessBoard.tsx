@@ -1,66 +1,65 @@
 import { Chess } from 'chess.js';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Chessboard } from 'react-chessboard';
+
 import Engine from '../public/stockfish/engine';
 
 const ChessBoard: React.FC = () => {
   const engine = useMemo(() => new Engine(), []);
-  const game = useMemo(() => new Chess(), []);
-  const [gamePosition, setGamePosition] = useState(game.fen());
-  const [boardWidth, setBoardWidth] = useState(0);
-  const boardContainerRef = useRef<HTMLDivElement>(null);
+  const [game, setGame] = useState(new Chess());
 
-  useEffect(() => {
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry) {
-        const { width, height } = entry.contentRect;
-        // Set board size to 90% of the smallest dimension of the container
-        const newSize = Math.min(width, height) * 0.9;
-        setBoardWidth(newSize);
-      }
-    });
-
-    if (boardContainerRef.current) {
-      observer.observe(boardContainerRef.current);
-    }
-
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
-
-  function findBestMove() {
-    engine.evaluatePosition(game.fen());
-    engine.onMessage(({
-      bestMove
-    }) => {
-      if (bestMove) {
-        game.move({
-          from: bestMove.substring(0, 2),
-          to: bestMove.substring(2, 4),
-          promotion: bestMove.substring(4, 5)
-        });
-        setGamePosition(game.fen());
-      }
+  function safeGameMutate(modify: (g: Chess) => void) {
+    setGame((g) => {
+      const newGame = new Chess(g.fen());
+      modify(newGame);
+      return newGame;
     });
   }
 
-  function onDrop(sourceSquare: string, targetSquare: string, piece: string) {
-    const move = game.move({
-      from: sourceSquare,
-      to: targetSquare,
-      promotion: piece[1].toLowerCase() ?? "q"
+  // Single listener for the engine's responses
+  useEffect(() => {
+    engine.onMessage(({ bestMove }) => {
+      if (bestMove) {
+        safeGameMutate((g) => {
+          const moveObject: { from: string; to: string; promotion?: string } = {
+            from: bestMove.substring(0, 2),
+            to: bestMove.substring(2, 4),
+          };
+          if (bestMove.length === 5) {
+            moveObject.promotion = bestMove.substring(4, 5);
+          }
+          g.move(moveObject);
+        });
+      }
     });
-    setGamePosition(game.fen());
+  }, [engine]);
 
-    // illegal move
-    if (move === null) return false;
+  function onDrop(sourceSquare: string, targetSquare: string, piece: string) {
+    let moveSuccessful = false;
+    safeGameMutate((g) => {
+      const moveObject: { from: string; to: string; promotion?: string } = {
+        from: sourceSquare,
+        to: targetSquare,
+      };
 
-    // exit if the game is over
-    if (game.isGameOver() || game.isDraw()) return false;
-    findBestMove();
-    return true;
+      const isPromotion =
+        (piece === 'wP' && sourceSquare[1] === '7' && targetSquare[1] === '8') ||
+        (piece === 'bP' && sourceSquare[1] === '2' && targetSquare[1] === '1');
+
+      if (isPromotion) {
+        moveObject.promotion = 'q';
+      }
+
+      const move = g.move(moveObject);
+      if (move) {
+        moveSuccessful = true;
+        // If the move was successful, ask the engine for the next move
+        if (!g.isGameOver() && !g.isDraw()) {
+          engine.evaluatePosition(g.fen());
+        }
+      }
+    });
+    return moveSuccessful;
   }
 
   const [activeSquare, setActiveSquare] = useState("");
@@ -151,7 +150,6 @@ const ChessBoard: React.FC = () => {
     fontSize: "0.875rem"
   };
 
-  // Cleanup engine on unmount
   useEffect(() => {
     return () => {
       engine.terminate();
@@ -159,81 +157,79 @@ const ChessBoard: React.FC = () => {
   }, [engine]);
 
   return (
-    <div ref={boardContainerRef} style={boardWrapperStyle}>
+    <div style={boardWrapperStyle}>
       <div style={{
         display: "flex",
         justifyContent: "center",
         marginBottom: '1rem',
       }}>
         <button style={buttonStyle} onClick={() => {
-          game.reset();
-          setGamePosition(game.fen());
+          safeGameMutate((g) => { g.reset(); });
         }}>
           Reset
         </button>
         <button style={buttonStyle} onClick={() => {
-          game.undo();
-          game.undo();
-          setGamePosition(game.fen());
+          safeGameMutate((g) => {
+            g.undo();
+            g.undo();
+          });
         }}>
           Undo
         </button>
       </div>
-      {boardWidth > 0 && (
-        <div style={{ marginTop: '-10px' }}>
-          <style jsx>{`
+      <div style={{ marginTop: '-10px' }}>
+        <style jsx>{`
             :global([data-boardid="Styled3DBoard"] > div) {
               margin-top: -3px !important;
               margin-left: -10px !important;
             }
           `}</style>
-          <Chessboard
-            id="Styled3DBoard"
-            position={gamePosition}
-            onPieceDrop={onDrop}
-            boardWidth={boardWidth}
-            customBoardStyle={{
-              transform: "rotateX(27.5deg)",
-              transformOrigin: "center",
-              border: "16px solid #b8836f",
-              borderStyle: "outset",
-              borderRightColor: " #b27c67",
-              borderRadius: "4px",
-              boxShadow: "rgba(0, 0, 0, 0.5) 2px 24px 24px 8px",
-              borderRightWidth: "16px",
-              borderLeftWidth: "16px",
-              borderTopWidth: "0px",
-              borderBottomWidth: "18px",
-              borderTopLeftRadius: "8px",
-              borderTopRightRadius: "8px",
-              padding: "8px 8px 12px",
-              backgroundColor: "#e0c094",
-              backgroundImage: 'url("/wood-pattern.png")',
-              backgroundSize: "cover",
-            }}
-            customPieces={threeDPieces}
-            customLightSquareStyle={{
-              backgroundColor: "#e0c094",
-              backgroundImage: 'url("/wood-pattern.png")',
-              backgroundSize: "cover"
-            }} customDarkSquareStyle={{
-              backgroundColor: "#865745",
-              backgroundImage: 'url("/wood-pattern.png")',
-              backgroundSize: "cover"
-            }}
-            animationDuration={500}
-            customSquareStyles={{
-              [activeSquare]: {
-                boxShadow: "inset 0 0 1px 6px rgba(255,255,255,0.75)"
-              }
-            }}
-            onMouseOverSquare={(sq) => setActiveSquare(sq)}
-            onMouseOutSquare={() => setActiveSquare("")}
-          />
-        </div>
-      )}
+        <Chessboard
+          id="Styled3DBoard"
+          position={game.fen()}
+          onPieceDrop={onDrop}
+          boardWidth={640}
+          customBoardStyle={{
+            transform: "rotateX(27.5deg)",
+            transformOrigin: "center",
+            border: "16px solid #b8836f",
+            borderStyle: "outset",
+            borderRightColor: " #b27c67",
+            borderRadius: "4px",
+            boxShadow: "rgba(0, 0, 0, 0.5) 2px 24px 24px 8px",
+            borderRightWidth: "16px",
+            borderLeftWidth: "16px",
+            borderTopWidth: "0px",
+            borderBottomWidth: "18px",
+            borderTopLeftRadius: "8px",
+            borderTopRightRadius: "8px",
+            padding: "8px 8px 12px",
+            backgroundColor: "#e0c094",
+            backgroundImage: 'url("/wood-pattern.png")',
+            backgroundSize: "cover",
+          }}
+          customPieces={threeDPieces}
+          customLightSquareStyle={{
+            backgroundColor: "#e0c094",
+            backgroundImage: 'url("/wood-pattern.png")',
+            backgroundSize: "cover"
+          }} customDarkSquareStyle={{
+            backgroundColor: "#865745",
+            backgroundImage: 'url("/wood-pattern.png")',
+            backgroundSize: "cover"
+          }}
+          animationDuration={500}
+          customSquareStyles={{
+            [activeSquare]: {
+              boxShadow: "inset 0 0 1px 6px rgba(255,255,255,0.75)"
+            }
+          }}
+          onMouseOverSquare={(sq) => setActiveSquare(sq)}
+          onMouseOutSquare={() => setActiveSquare("")}
+        />
+      </div>
     </div>
   );
 };
 
-export default ChessBoard; 
+export default ChessBoard;
