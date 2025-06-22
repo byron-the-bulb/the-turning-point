@@ -536,7 +536,7 @@ class HumeObserver(BaseObserver, BaseObject):
             return self.facial_data_session_id
                 
         except Exception as e:
-            logger.error(f"Error getting current session ID: {e}")
+            #logger.error(f"Error getting current session ID: {e}")
             # Return default if unable to get from server
             return 0
     
@@ -573,7 +573,7 @@ class HumeObserver(BaseObserver, BaseObject):
                 # Get current session ID from server
                 session_id = await self._get_current_session_id()
                 if not session_id:
-                    logger.warning("No session ID available, skipping facial data send")
+                    #logger.warning("No session ID available, skipping facial data send")
                     return
                 
                 # Prepare payload for the server

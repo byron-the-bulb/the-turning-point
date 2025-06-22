@@ -299,9 +299,9 @@ async def run_bot(room_url, token, identifier, data=None):
     bot_is_speaking_local = False
     cached_status_frames_local = []
 
-    @hume_observer.event_handler("on_face_emotions_received")
-    async def on_face_emotions_received_local(hume_processor, face_data):
-        logger.info(f"Face emotions : {face_data}")
+    #@hume_observer.event_handler("on_face_emotions_received")
+    #async def on_face_emotions_received_local(hume_processor, face_data):
+    #    logger.info(f"Face emotions")
     # --- End local state ---
 
     # @hume_observer.event_handler("on_start_processing_emotions")

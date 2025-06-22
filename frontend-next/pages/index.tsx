@@ -1,6 +1,6 @@
 import styles from '@/styles/Home.module.css';
 import { RTVIClient, RTVIEvent } from '@pipecat-ai/client-js';
-import { RTVIClientAudio, RTVIClientProvider } from '@pipecat-ai/client-react';
+import { RTVIClientAudio, RTVIClientProvider, RTVIClientVideo } from '@pipecat-ai/client-react';
 import { DailyTransport } from '@pipecat-ai/daily-transport';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
@@ -575,10 +575,14 @@ export default function Home() {
         <aside className={styles.rightPanel}>
           <div className={styles.rightPanelContent}>
             <div className={styles.videoContainer}>
-              <video muted playsInline autoPlay loop poster="/TurningPointBackground.png" className={styles.videoPlaceholder}>
-                  {/* <source src="/path/to/video.mp4" type="video/mp4" /> */}
-                  Your browser does not support the video tag.
-              </video>
+              <RTVIClientVideo
+                participant="local"
+                fit="cover"
+                mirror
+                onResize={({ aspectRatio, height, width }) => {
+                  console.log("Video dimensions changed:", { aspectRatio, height, width });
+                }}
+              />
             </div>
             {participantId ? (
               <>
